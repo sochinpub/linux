@@ -10,6 +10,9 @@
  */
 #ifndef VMX_H
 #define VMX_H
+/*
+ Intel 处理器vmx结构体定义
+ */
 
 
 #include <linux/bitops.h>
@@ -17,10 +20,13 @@
 #include <uapi/asm/vmx.h>
 #include <asm/vmxfeatures.h>
 
+// vmcs features控制位，5个feature
 #define VMCS_CONTROL_BIT(x)	BIT(VMX_FEATURE_##x & 0x1f)
 
 /*
  * Definitions of Primary Processor-Based VM-Execution Controls.
+ *
+ * 主处理器的 VM-Execution 控制定义
  */
 #define CPU_BASED_INTR_WINDOW_EXITING           VMCS_CONTROL_BIT(INTR_WINDOW_EXITING)
 #define CPU_BASED_USE_TSC_OFFSETTING            VMCS_CONTROL_BIT(USE_TSC_OFFSETTING)
@@ -50,7 +56,7 @@
  * Definitions of Secondary Processor-Based VM-Execution Controls.
  */
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES VMCS_CONTROL_BIT(VIRT_APIC_ACCESSES)
-#define SECONDARY_EXEC_ENABLE_EPT               VMCS_CONTROL_BIT(EPT)
+#define SECONDARY_EXEC_ENABLE_EPT               VMCS_CONTROL_BIT(EPT)					// EPT支持位，二级处理器执行控制位的第2位
 #define SECONDARY_EXEC_DESC			VMCS_CONTROL_BIT(DESC_EXITING)
 #define SECONDARY_EXEC_ENABLE_RDTSCP		VMCS_CONTROL_BIT(RDTSCP)
 #define SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE   VMCS_CONTROL_BIT(VIRTUAL_X2APIC)

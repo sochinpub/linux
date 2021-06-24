@@ -264,6 +264,7 @@ sched_clock(void) __attribute__((alias("native_sched_clock")));
 bool using_native_sched_clock(void) { return true; }
 #endif
 
+// tsc时钟源是否稳定
 int check_tsc_unstable(void)
 {
 	return tsc_unstable;

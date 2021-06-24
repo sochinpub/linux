@@ -139,6 +139,7 @@ err:
  * All the files created with anon_inode_getfile() will share a single inode,
  * hence saving memory and avoiding code duplication for the file/inode/dentry
  * setup.  Returns the newly created file* or an error pointer.
+ * 创建一个匿名新文件，所有匿名文件会共享一个inode：省内存，且避免代码复制
  */
 struct file *anon_inode_getfile(const char *name,
 				const struct file_operations *fops,

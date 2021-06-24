@@ -37,12 +37,16 @@
 
 #define __KVM_HAVE_ARCH_VCPU_DEBUGFS
 
+// 最大支持的vcpu数量
 #define KVM_MAX_VCPUS 288
 #define KVM_SOFT_MAX_VCPUS 240
 #define KVM_MAX_VCPU_ID 1023
-/* memory slots that are not exposed to userspace */
+/* memory slots that are not exposed to userspace 
+* 3个mem slots不暴露给用户
+*/
 #define KVM_PRIVATE_MEM_SLOTS 3
 
+// 200000ns = 200us， halt poll一次
 #define KVM_HALT_POLL_NS_DEFAULT 200000
 
 #define KVM_IRQCHIP_NUM_PINS  KVM_IOAPIC_NUM_PINS
@@ -53,7 +57,9 @@
 #define KVM_BUS_LOCK_DETECTION_VALID_MODE	(KVM_BUS_LOCK_DETECTION_OFF | \
 						 KVM_BUS_LOCK_DETECTION_EXIT)
 
-/* x86-specific vcpu->requests bit members */
+/* x86-specific vcpu->requests bit members 
+* x86特定的vcpu请求位
+*/
 #define KVM_REQ_MIGRATE_TIMER		KVM_ARCH_REQ(0)
 #define KVM_REQ_REPORT_TPR_ACCESS	KVM_ARCH_REQ(1)
 #define KVM_REQ_TRIPLE_FAULT		KVM_ARCH_REQ(2)
@@ -92,6 +98,9 @@
 #define KVM_REQ_UPDATE_CPU_DIRTY_LOGGING \
 	KVM_ARCH_REQ_FLAGS(30, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
 
+/**
+ * 
+ */
 #define CR0_RESERVED_BITS                                               \
 	(~(unsigned long)(X86_CR0_PE | X86_CR0_MP | X86_CR0_EM | X86_CR0_TS \
 			  | X86_CR0_ET | X86_CR0_NE | X86_CR0_WP | X86_CR0_AM \
@@ -369,6 +378,8 @@ struct kvm_mmu_page;
  * x86 supports 4 paging modes (5-level 64-bit, 4-level 64-bit, 3-level 32-bit,
  * and 2-level 32-bit).  The kvm_mmu structure abstracts the details of the
  * current mmu mode.
+ * x86支持4种分页：5-级64位分页，4级64位分页，3级32位分页，2级32位分页。
+ * kvm_mmu结构体抽象了当前mmu模式的详细细节。
  */
 struct kvm_mmu {
 	unsigned long (*get_guest_pgd)(struct kvm_vcpu *vcpu);
@@ -384,13 +395,13 @@ struct kvm_mmu {
 	int (*sync_page)(struct kvm_vcpu *vcpu,
 			 struct kvm_mmu_page *sp);
 	void (*invlpg)(struct kvm_vcpu *vcpu, gva_t gva, hpa_t root_hpa);
-	hpa_t root_hpa;
+	hpa_t root_hpa;						// 指向EPT页表中的第一级页表，类似于x86中的CR3寄存器
 	gpa_t root_pgd;
 	union kvm_mmu_role mmu_role;
 	u8 root_level;
 	u8 shadow_root_level;
 	u8 ept_ad;
-	bool direct_map;
+	bool direct_map;					// 是否直接映射（EPT）
 	struct kvm_mmu_root_info prev_roots[KVM_MMU_NUM_PREV_ROOTS];
 
 	/*
@@ -560,6 +571,7 @@ struct kvm_vcpu_xen {
 	u64 runstate_times[4];
 };
 
+// vcpu架构模拟
 struct kvm_vcpu_arch {
 	/*
 	 * rip and regs accesses must go through
@@ -605,6 +617,7 @@ struct kvm_vcpu_arch {
 	 * If the vcpu runs in guest mode with two level paging this still saves
 	 * the paging mode of the l1 guest. This context is always used to
 	 * handle faults.
+	 * 模拟了CPU的mmu部件：控制cpu对内存的分页访问，处理page fault
 	 */
 	struct kvm_mmu *mmu;
 
@@ -1404,6 +1417,7 @@ struct kvm_x86_nested_ops {
 	uint16_t (*get_evmcs_version)(struct kvm_vcpu *vcpu);
 };
 
+// x86下 kvm的初始化
 struct kvm_x86_init_ops {
 	int (*cpu_has_kvm_support)(void);
 	int (*disabled_by_bios)(void);
@@ -1438,6 +1452,7 @@ static inline void kvm_ops_static_call_update(void)
 #include <asm/kvm-x86-ops.h>
 }
 
+// 分配kvm结构体内存：内存清零
 #define __KVM_HAVE_ARCH_VM_ALLOC
 static inline struct kvm *kvm_arch_alloc_vm(void)
 {
@@ -1495,7 +1510,7 @@ void kvm_unregister_irq_mask_notifier(struct kvm *kvm, int irq,
 void kvm_fire_mask_notifiers(struct kvm *kvm, unsigned irqchip, unsigned pin,
 			     bool mask);
 
-extern bool tdp_enabled;
+extern bool tdp_enabled;			// 什么是tdp
 
 u64 vcpu_tsc_khz(struct kvm_vcpu *vcpu);
 
@@ -1735,7 +1750,7 @@ enum {
 #define HF_SMM_INSIDE_NMI_MASK	(1 << 7)
 
 #define __KVM_VCPU_MULTIPLE_ADDRESS_SPACE
-#define KVM_ADDRESS_SPACE_NUM 2
+#define KVM_ADDRESS_SPACE_NUM 2			// KVM地址空间的个数2， 
 
 #define kvm_arch_vcpu_memslots_id(vcpu) ((vcpu)->arch.hflags & HF_SMM_MASK ? 1 : 0)
 #define kvm_memslots_for_spte_role(kvm, role) __kvm_memslots(kvm, (role).smm)

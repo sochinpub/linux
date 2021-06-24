@@ -8,6 +8,9 @@
 #include <asm/processor.h>
 #include <uapi/asm/kvm_para.h>
 
+// 什么是pv ???
+// x86 CPU支持的caps 21
+
 extern u32 kvm_cpu_caps[NR_KVM_CPU_CAPS] __read_mostly;
 void kvm_set_cpu_caps(void);
 
@@ -187,6 +190,7 @@ static __always_inline void kvm_cpu_cap_clear(unsigned int x86_feature)
 	kvm_cpu_caps[x86_leaf] &= ~__feature_bit(x86_feature);
 }
 
+// kvm设置CPU支持的caps
 static __always_inline void kvm_cpu_cap_set(unsigned int x86_feature)
 {
 	unsigned int x86_leaf = __feature_leaf(x86_feature);
@@ -214,6 +218,7 @@ static __always_inline void kvm_cpu_cap_check_and_set(unsigned int x86_feature)
 		kvm_cpu_cap_set(x86_feature);
 }
 
+// // 为每个物理CPU分配一个VMCS结构体，并放到percpu变量中
 static __always_inline bool guest_pv_has(struct kvm_vcpu *vcpu,
 					 unsigned int kvm_feature)
 {

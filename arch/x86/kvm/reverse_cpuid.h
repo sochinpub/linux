@@ -10,10 +10,11 @@
  * Hardware-defined CPUID leafs that are scattered in the kernel, but need to
  * be directly used by KVM.  Note, these word values conflict with the kernel's
  * "bug" caps, but KVM doesn't use those.
+ * 硬件定义的CPUID leafs，被内核聚合了。kvm需要直接使用，因此这里
  */
 enum kvm_only_cpuid_leafs {
 	CPUID_12_EAX	 = NCAPINTS,
-	NR_KVM_CPU_CAPS,
+	NR_KVM_CPU_CAPS,				// 21
 
 	NKVMCAPINTS = NR_KVM_CPU_CAPS - NCAPINTS,
 };

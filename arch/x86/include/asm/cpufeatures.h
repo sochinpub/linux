@@ -12,8 +12,10 @@
 
 /*
  * Defines x86 CPU feature bits
+ * 20个32-bit的字用来表示CPU的features
  */
 #define NCAPINTS			20	   /* N 32-bit words worth of info */
+// 1个32位字长表示bug flags
 #define NBUGINTS			1	   /* N 32-bit bug flags */
 
 /*

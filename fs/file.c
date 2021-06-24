@@ -530,6 +530,7 @@ int __get_unused_fd_flags(unsigned flags, unsigned long nofile)
 	return alloc_fd(0, nofile, flags);
 }
 
+// 获取一个未使用的文件句柄
 int get_unused_fd_flags(unsigned flags)
 {
 	return __get_unused_fd_flags(flags, rlimit(RLIMIT_NOFILE));
@@ -568,6 +569,7 @@ EXPORT_SYMBOL(put_unused_fd);
  *
  * This consumes the "file" refcount, so callers should treat it
  * as if they had called fput(file).
+ * 绑定file和fd
  */
 
 void fd_install(unsigned int fd, struct file *file)

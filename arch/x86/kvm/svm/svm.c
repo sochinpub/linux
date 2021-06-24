@@ -4564,10 +4564,11 @@ static struct kvm_x86_ops svm_x86_ops __initdata = {
 	.vcpu_deliver_sipi_vector = svm_vcpu_deliver_sipi_vector,
 };
 
+// X86 AMD svm硬件虚拟化初始化
 static struct kvm_x86_init_ops svm_init_ops __initdata = {
 	.cpu_has_kvm_support = has_svm,
 	.disabled_by_bios = is_disabled,
-	.hardware_setup = svm_hardware_setup,
+	.hardware_setup = svm_hardware_setup,	// SVM x86架构hardware_setup
 	.check_processor_compatibility = svm_check_processor_compat,
 
 	.runtime_ops = &svm_x86_ops,

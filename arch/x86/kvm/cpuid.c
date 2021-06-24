@@ -92,6 +92,7 @@ static int kvm_check_cpuid(struct kvm_cpuid_entry2 *entries, int nent)
 	return 0;
 }
 
+// kvm更新pv 运行时间
 void kvm_update_pv_runtime(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
@@ -106,6 +107,7 @@ void kvm_update_pv_runtime(struct kvm_vcpu *vcpu)
 		vcpu->arch.pv_cpuid.features = best->eax;
 }
 
+// kvm更新cpuid运行时间
 void kvm_update_cpuid_runtime(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
@@ -232,6 +234,7 @@ static void cpuid_fix_nx_cap(struct kvm_vcpu *vcpu)
 	}
 }
 
+// 查询最大支持的物理地址：48， 51
 int cpuid_query_maxphyaddr(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
@@ -1102,6 +1105,7 @@ out_free:
 	return r;
 }
 
+// kvm查找CPUID的入口点
 struct kvm_cpuid_entry2 *kvm_find_cpuid_entry(struct kvm_vcpu *vcpu,
 					      u32 function, u32 index)
 {

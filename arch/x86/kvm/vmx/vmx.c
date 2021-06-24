@@ -85,6 +85,7 @@ module_param_named(vnmi, enable_vnmi, bool, S_IRUGO);
 bool __read_mostly flexpriority_enabled = 1;
 module_param_named(flexpriority, flexpriority_enabled, bool, S_IRUGO);
 
+// 是否支持ept，默认支持。模块参数
 bool __read_mostly enable_ept = 1;
 module_param_named(ept, enable_ept, bool, S_IRUGO);
 
@@ -108,6 +109,7 @@ module_param(enable_apicv, bool, S_IRUGO);
  * If nested=1, nested virtualization is supported, i.e., guests may use
  * VMX and be a hypervisor for its own guests. If nested=0, guests may not
  * use VMX instructions.
+ * 嵌套虚拟化支持
  */
 static bool __read_mostly nested = 1;
 module_param(nested, bool, S_IRUGO);
@@ -410,6 +412,7 @@ noinline void invept_error(unsigned long ext, u64 eptp, gpa_t gpa)
 			ext, eptp, gpa);
 }
 
+// 定义percpu变量指针vmxarea指向每个CPU的vmcs结构体
 static DEFINE_PER_CPU(struct vmcs *, vmxarea);
 DEFINE_PER_CPU(struct vmcs *, current_vmcs);
 /*
@@ -453,6 +456,7 @@ static inline void vmx_segment_cache_clear(struct vcpu_vmx *vmx)
 	vmx->segment_cache.bitmask = 0;
 }
 
+// 中断描述符表基址
 static unsigned long host_idt_base;
 
 #if IS_ENABLED(CONFIG_HYPERV)
@@ -2365,11 +2369,13 @@ static void vmx_cache_reg(struct kvm_vcpu *vcpu, enum kvm_reg reg)
 	}
 }
 
+// CPU支持vmx
 static __init int cpu_has_kvm_support(void)
 {
 	return cpu_has_vmx();
 }
 
+// bios使能vmx, 读msr寄存器
 static __init int vmx_disabled_by_bios(void)
 {
 	return !boot_cpu_has(X86_FEATURE_MSR_IA32_FEAT_CTL) ||
@@ -2458,12 +2464,14 @@ static bool cpu_has_sgx(void)
 	return cpuid_eax(0) >= 0x12 && (cpuid_eax(0x12) & BIT(0));
 }
 
+// 
 static __init int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
 				      u32 msr, u32 *result)
 {
 	u32 vmx_msr_low, vmx_msr_high;
 	u32 ctl = ctl_min | ctl_opt;
 
+	// 读MSR_IA32_VMX_PROCBASED_CTLS msr寄存器的值到
 	rdmsr(msr, vmx_msr_low, vmx_msr_high);
 
 	ctl &= vmx_msr_high; /* bit == 0 in high word ==> must be zero */
@@ -2477,6 +2485,7 @@ static __init int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
 	return 0;
 }
 
+// vmcs配置初始化
 static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf,
 				    struct vmx_capability *vmx_cap)
 {
@@ -2542,6 +2551,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf,
 			SECONDARY_EXEC_BUS_LOCK_DETECTION;
 		if (cpu_has_sgx())
 			opt2 |= SECONDARY_EXEC_ENCLS_EXITING;
+		// 读取MSR_IA32_VMX_PROCBASED_CTLS寄存器存放到vmcs_conf->cpu_based_2nd_exec_ctrl
 		if (adjust_vmx_controls(min2, opt2,
 					MSR_IA32_VMX_PROCBASED_CTLS2,
 					&_cpu_based_2nd_exec_control) < 0)
@@ -2559,12 +2569,18 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf,
 				SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
 				SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY);
 
+	// msr寄存器MSR_IA32_VMX_EPT_VPID_CAP，第6位指示是否支持四级页表
 	rdmsr_safe(MSR_IA32_VMX_EPT_VPID_CAP,
 		&vmx_cap->ept, &vmx_cap->vpid);
 
+	/**
+	 * MSR_IA32_VMX_PROCBASED_CTLS2 msr寄存器显示支持EPT
+	 */
 	if (_cpu_based_2nd_exec_control & SECONDARY_EXEC_ENABLE_EPT) {
 		/* CR3 accesses and invlpg don't need to cause VM Exits when EPT
-		   enabled */
+		   enabled 
+		   当使能EPT时，访问CR3寄存器或者执行特权invlpg指令（刷新TLB中特定的page, invalid TLB Entry）不需要VM Exits
+		   */
 		_cpu_based_exec_control &= ~(CPU_BASED_CR3_LOAD_EXITING |
 					     CPU_BASED_CR3_STORE_EXITING |
 					     CPU_BASED_INVLPG_EXITING);
@@ -2666,6 +2682,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf,
 
 	vmcs_conf->pin_based_exec_ctrl = _pin_based_exec_control;
 	vmcs_conf->cpu_based_exec_ctrl = _cpu_based_exec_control;
+	// 标记
 	vmcs_conf->cpu_based_2nd_exec_ctrl = _cpu_based_2nd_exec_control;
 	vmcs_conf->vmexit_ctrl         = _vmexit_control;
 	vmcs_conf->vmentry_ctrl        = _vmentry_control;
@@ -2678,16 +2695,20 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf,
 	return 0;
 }
 
+// 为CPU分配vmcs结构体
 struct vmcs *alloc_vmcs_cpu(bool shadow, int cpu, gfp_t flags)
 {
 	int node = cpu_to_node(cpu);
 	struct page *pages;
 	struct vmcs *vmcs;
 
+	// 在该CPU的node上分配内存：4KB
 	pages = __alloc_pages_node(node, flags, vmcs_config.order);
 	if (!pages)
 		return NULL;
+	// 转换成物理地址
 	vmcs = page_address(pages);
+	// 清零
 	memset(vmcs, 0, vmcs_config.size);
 
 	/* KVM supports Enlightened VMCS v1 only */
@@ -2696,6 +2717,7 @@ struct vmcs *alloc_vmcs_cpu(bool shadow, int cpu, gfp_t flags)
 	else
 		vmcs->hdr.revision_id = vmcs_config.revision_id;
 
+	// 什么是shadow ???
 	if (shadow)
 		vmcs->hdr.shadow_vmcs = 1;
 	return vmcs;
@@ -2772,6 +2794,7 @@ static void free_kvm_area(void)
 	}
 }
 
+// 为每个物理CPU分配一个VMCS结构体，并放到percpu变量中
 static __init int alloc_kvm_area(void)
 {
 	int cpu;
@@ -2779,6 +2802,7 @@ static __init int alloc_kvm_area(void)
 	for_each_possible_cpu(cpu) {
 		struct vmcs *vmcs;
 
+		// 分配vmcs
 		vmcs = alloc_vmcs_cpu(false, cpu, GFP_KERNEL);
 		if (!vmcs) {
 			free_kvm_area();
@@ -2798,6 +2822,7 @@ static __init int alloc_kvm_area(void)
 		if (static_branch_unlikely(&enable_evmcs))
 			vmcs->hdr.revision_id = vmcs_config.revision_id;
 
+		// 赋值给per cpu变量
 		per_cpu(vmxarea, cpu) = vmcs;
 	}
 	return 0;
@@ -7004,6 +7029,7 @@ static int vmx_vm_init(struct kvm *kvm)
 	return 0;
 }
 
+// x86 intel vmx cpu兼容性检查
 static int __init vmx_check_processor_compat(void)
 {
 	struct vmcs_config vmcs_conf;
@@ -7015,10 +7041,12 @@ static int __init vmx_check_processor_compat(void)
 		return -EIO;
 	}
 
+	// 再次读取当前cpu硬件 vmcs配置信息
 	if (setup_vmcs_config(&vmcs_conf, &vmx_cap) < 0)
 		return -EIO;
 	if (nested)
 		nested_vmx_setup_ctls_msrs(&vmcs_conf.nested, vmx_cap.ept);
+	// 与全局的不一样，各个cpu的配置不一样则会出错
 	if (memcmp(&vmcs_config, &vmcs_conf, sizeof(struct vmcs_config)) != 0) {
 		printk(KERN_ERR "kvm: CPU %d feature inconsistency!\n",
 				smp_processor_id());
@@ -7284,6 +7312,7 @@ static void vmx_vcpu_after_set_cpuid(struct kvm_vcpu *vcpu)
 	vmx_update_exception_bitmap(vcpu);
 }
 
+// cpu features支持设置
 static __init void vmx_set_cpu_caps(void)
 {
 	kvm_set_cpu_caps();
@@ -7611,6 +7640,7 @@ static bool vmx_check_apicv_inhibit_reasons(ulong bit)
 	return supported & BIT(bit);
 }
 
+// x86 intel kvm虚拟机操作集合
 static struct kvm_x86_ops vmx_x86_ops __initdata = {
 	.hardware_unsetup = hardware_unsetup,
 
@@ -7744,6 +7774,7 @@ static struct kvm_x86_ops vmx_x86_ops __initdata = {
 	.vcpu_deliver_sipi_vector = kvm_vcpu_deliver_sipi_vector,
 };
 
+// 初始化msr寄存器
 static __init void vmx_setup_user_return_msrs(void)
 {
 
@@ -7767,20 +7798,27 @@ static __init void vmx_setup_user_return_msrs(void)
 	BUILD_BUG_ON(ARRAY_SIZE(vmx_uret_msrs_list) != MAX_NR_USER_RETURN_MSRS);
 
 	for (i = 0; i < ARRAY_SIZE(vmx_uret_msrs_list); ++i)
+		// 添加msr
 		kvm_add_user_return_msr(vmx_uret_msrs_list[i]);
 }
 
+/*
+ * x86 intel kvm初始化
+ */
 static __init int hardware_setup(void)
 {
 	unsigned long host_bndcfgs;
-	struct desc_ptr dt;
+	struct desc_ptr dt;		// 内存区域
 	int r, ept_lpage_level;
 
+	// 1) 中断描述符表寄存器存储到内存
 	store_idt(&dt);
 	host_idt_base = dt.address;
 
+	// 2) ???
 	vmx_setup_user_return_msrs();
 
+	// 3) 读硬件，vmcs配置
 	if (setup_vmcs_config(&vmcs_config, &vmx_capability) < 0)
 		return -EIO;
 
@@ -7800,6 +7838,7 @@ static __init int hardware_setup(void)
 	    !(cpu_has_vmx_invvpid_single() || cpu_has_vmx_invvpid_global()))
 		enable_vpid = 0;
 
+	// 判断1)cpu是否支持ept 2)ept是否是4级页表 3) 4)
 	if (!cpu_has_vmx_ept() ||
 	    !cpu_has_vmx_ept_4levels() ||
 	    !cpu_has_vmx_ept_mt_wb() ||
@@ -7851,6 +7890,7 @@ static __init int hardware_setup(void)
 		vmx_x86_ops.sync_pir_to_irr = NULL;
 	}
 
+	// tsc scaling是什么???
 	if (cpu_has_vmx_tsc_scaling()) {
 		kvm_has_tsc_control = true;
 		kvm_max_tsc_scaling_ratio = KVM_VMX_TSC_MULTIPLIER_MAX;
@@ -7915,6 +7955,7 @@ static __init int hardware_setup(void)
 		vmx_x86_ops.request_immediate_exit = __kvm_request_immediate_exit;
 	}
 
+	// post interrupt是什么???
 	kvm_set_posted_intr_wakeup_handler(pi_wakeup_handler);
 
 	kvm_mce_cap_supported |= MCG_LMCE_P;
@@ -7924,8 +7965,10 @@ static __init int hardware_setup(void)
 	if (!enable_ept || !cpu_has_vmx_intel_pt())
 		pt_mode = PT_MODE_SYSTEM;
 
+	// sgx特性
 	setup_default_sgx_lepubkeyhash();
 
+	// 嵌套虚拟化
 	if (nested) {
 		nested_vmx_setup_ctls_msrs(&vmcs_config.nested,
 					   vmx_capability.ept);
@@ -7935,14 +7978,17 @@ static __init int hardware_setup(void)
 			return r;
 	}
 
+	// 设置kvm cpu的features caps
 	vmx_set_cpu_caps();
 
+	// 为每个物理CPU分配一个VMCS结构体，并放到percpu变量中
 	r = alloc_kvm_area();
 	if (r)
 		nested_vmx_hardware_unsetup();
 	return r;
 }
 
+// x86 intel vmx硬件虚拟化
 static struct kvm_x86_init_ops vmx_init_ops __initdata = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -7998,6 +8044,7 @@ static void vmx_exit(void)
 }
 module_exit(vmx_exit);
 
+// x86 Intel vmx硬件虚拟化init
 static int __init vmx_init(void)
 {
 	int r, cpu;
@@ -8036,8 +8083,11 @@ static int __init vmx_init(void)
 	}
 #endif
 
-	r = kvm_init(&vmx_init_ops, sizeof(struct vcpu_vmx),
-		     __alignof__(struct vcpu_vmx), THIS_MODULE);
+	// 1) 架构无关的kvm初始化
+	r = kvm_init(&vmx_init_ops,
+				sizeof(struct vcpu_vmx),	// vcpu大小
+		     	__alignof__(struct vcpu_vmx),
+			 	THIS_MODULE);
 	if (r)
 		return r;
 

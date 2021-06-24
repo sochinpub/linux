@@ -21,6 +21,7 @@
 
 /*
  * VMX functions:
+ * CPU CPUID指令判断支持vmx
  */
 
 static inline int cpu_has_vmx(void)

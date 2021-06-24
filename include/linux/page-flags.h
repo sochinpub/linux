@@ -598,6 +598,7 @@ TESTPAGEFLAG_FALSE(HeadHuge)
 #endif
 
 
+// 透明大页使用
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 /*
  * PageHuge() only returns true for hugetlbfs pages, but not for
@@ -606,6 +607,7 @@ TESTPAGEFLAG_FALSE(HeadHuge)
  * PageTransHuge() returns true for both transparent huge and
  * hugetlbfs pages, but not normal pages. PageTransHuge() can only be
  * called only in the core VM paths where hugetlbfs pages can't exist.
+ * 透明大页和hugetlbfs都返回
  */
 static inline int PageTransHuge(struct page *page)
 {

@@ -4524,6 +4524,7 @@ kvm_calc_tdp_mmu_root_page_role(struct kvm_vcpu *vcpu, bool base_only)
 	return role;
 }
 
+// 初始化mmu
 static void init_kvm_tdp_mmu(struct kvm_vcpu *vcpu)
 {
 	struct kvm_mmu *context = &vcpu->arch.root_mmu;
@@ -4793,6 +4794,7 @@ static void init_kvm_nested_mmu(struct kvm_vcpu *vcpu)
 	update_last_nonleaf_level(vcpu, g_context);
 }
 
+// 初始化mmu
 void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots)
 {
 	if (reset_roots) {
@@ -4804,10 +4806,11 @@ void kvm_init_mmu(struct kvm_vcpu *vcpu, bool reset_roots)
 			vcpu->arch.mmu->prev_roots[i] = KVM_MMU_ROOT_INFO_INVALID;
 	}
 
+	// tdp是什么???
 	if (mmu_is_nested(vcpu))
 		init_kvm_nested_mmu(vcpu);
 	else if (tdp_enabled)
-		init_kvm_tdp_mmu(vcpu);
+		init_kvm_tdp_mmu(vcpu);			// tdp和soft区别
 	else
 		init_kvm_softmmu(vcpu);
 }
@@ -5183,6 +5186,9 @@ void kvm_mmu_invpcid_gva(struct kvm_vcpu *vcpu, gva_t gva, unsigned long pcid)
 	 */
 }
 
+/**
+ * 配置mmu相关变量
+ */
 void kvm_configure_mmu(bool enable_tdp, int tdp_max_root_level,
 		       int tdp_huge_page_level)
 {
@@ -5314,6 +5320,9 @@ static int __kvm_mmu_create(struct kvm_vcpu *vcpu, struct kvm_mmu *mmu)
 	return 0;
 }
 
+/**
+ * 创建mmu
+ */
 int kvm_mmu_create(struct kvm_vcpu *vcpu)
 {
 	int ret;

@@ -365,6 +365,9 @@ struct per_cpu_nodestat {
 
 #endif /* !__GENERATING_BOUNDS.H */
 
+/**
+ mem zone类型
+ */
 enum zone_type {
 	/*
 	 * ZONE_DMA and ZONE_DMA32 are used when there are peripherals not able
@@ -449,7 +452,7 @@ enum zone_type {
 	 * there can be false negatives).
 	 */
 	ZONE_MOVABLE,
-#ifdef CONFIG_ZONE_DEVICE
+#ifdef CONFIG_ZONE_DEVICE // 这是什么类型
 	ZONE_DEVICE,
 #endif
 	__MAX_NR_ZONES

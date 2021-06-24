@@ -4,8 +4,11 @@
 
 /*
  * Defines VMX CPU feature bits
+ * x86 Intel CPU硬件虚拟化VMX支持的CPU特性位
  */
-#define NVMXINTS			3 /* N 32-bit words worth of info */
+#define NVMXINTS			3 /* N 32-bit words worth of info 
+3个32bits的字长，表示的features支持
+*/
 
 /*
  * Note: If the comment begins with a quoted string, that string is used
@@ -33,7 +36,9 @@
 /* VM-Functions, shifted to bits 28-31 */
 #define VMX_FEATURE_EPTP_SWITCHING	( 0*32+ 28) /* EPTP switching (in guest) */
 
-/* Primary Processor-Based VM-Execution Controls, word 1 */
+/* Primary Processor-Based VM-Execution Controls, word 1 
+* 基于主处理器的VM执行控制位
+*/
 #define VMX_FEATURE_INTR_WINDOW_EXITING ( 1*32+  2) /* "" VM-Exit if INTRs are unblocked in guest */
 #define VMX_FEATURE_USE_TSC_OFFSETTING	( 1*32+  3) /* "tsc_offset" Offset hardware TSC when read in guest */
 #define VMX_FEATURE_HLT_EXITING		( 1*32+  7) /* "" VM-Exit on HLT */
@@ -56,9 +61,11 @@
 #define VMX_FEATURE_PAUSE_EXITING	( 1*32+ 30) /* "" VM-Exit on PAUSE (unconditionally) */
 #define VMX_FEATURE_SEC_CONTROLS	( 1*32+ 31) /* "" Enable Secondary VM-Execution Controls */
 
-/* Secondary Processor-Based VM-Execution Controls, word 2 */
+/* Secondary Processor-Based VM-Execution Controls, word 2 
+* 基于二级处理器VM执行控制位
+*/
 #define VMX_FEATURE_VIRT_APIC_ACCESSES	( 2*32+  0) /* "vapic" Virtualize memory mapped APIC accesses */
-#define VMX_FEATURE_EPT			( 2*32+  1) /* Extended Page Tables, a.k.a. Two-Dimensional Paging */
+#define VMX_FEATURE_EPT			( 2*32+  1) /* Extended Page Tables, a.k.a. Two-Dimensional Paging 虚拟化EPT支持，虚拟化两级分页*/
 #define VMX_FEATURE_DESC_EXITING	( 2*32+  2) /* "" VM-Exit on {S,L}*DT instructions */
 #define VMX_FEATURE_RDTSCP		( 2*32+  3) /* "" Enable RDTSCP in guest */
 #define VMX_FEATURE_VIRTUAL_X2APIC	( 2*32+  4) /* "" Virtualize X2APIC for the guest */

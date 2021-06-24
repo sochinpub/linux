@@ -3880,6 +3880,7 @@ void wake_up_new_task(struct task_struct *p)
 
 static DEFINE_STATIC_KEY_FALSE(preempt_notifier_key);
 
+// 抢占通知 ??? 什么机制
 void preempt_notifier_inc(void)
 {
 	static_branch_inc(&preempt_notifier_key);

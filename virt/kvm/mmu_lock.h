@@ -8,6 +8,7 @@
  * for the mmu_lock.  These macros, for use in common code
  * only, avoids using #ifdefs in places that must deal with
  * multiple architectures.
+ * 优先使用读写锁，再次使用spin lock
  */
 
 #ifdef KVM_HAVE_MMU_RWLOCK

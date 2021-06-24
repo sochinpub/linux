@@ -109,6 +109,7 @@ static inline unsigned long gate_segment(const gate_desc *g)
 	return g->segment;
 }
 
+// 内存描述符
 struct desc_ptr {
 	unsigned short size;
 	unsigned long address;

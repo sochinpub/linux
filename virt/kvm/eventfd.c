@@ -512,6 +512,7 @@ void kvm_unregister_irq_ack_notifier(struct kvm *kvm,
 }
 #endif
 
+// 初始化eventfd
 void
 kvm_eventfd_init(struct kvm *kvm)
 {
@@ -634,6 +635,8 @@ void kvm_irq_routing_update(struct kvm *kvm)
  * create a host-wide workqueue for issuing deferred shutdown requests
  * aggregated from all vm* instances. We need our own isolated
  * queue to ease flushing work items when a VM exits.
+ * 创建一个workqueue线程，用来发射延后的关闭请求给所有VMs，
+ * 
  */
 int kvm_irqfd_init(void)
 {

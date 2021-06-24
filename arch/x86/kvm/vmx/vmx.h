@@ -351,6 +351,7 @@ struct vcpu_vmx {
 	} shadow_msr_intercept;
 };
 
+// x86 intel kvm 定义
 struct kvm_vmx {
 	struct kvm kvm;
 

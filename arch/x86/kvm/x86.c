@@ -336,25 +336,31 @@ static void kvm_on_user_return(struct user_return_notifier *urn)
 	}
 }
 
+// 探测
 static int kvm_probe_user_return_msr(u32 msr)
 {
 	u64 val;
 	int ret;
 
+	// 关抢占
 	preempt_disable();
+	// 读寄存器
 	ret = rdmsrl_safe(msr, &val);
 	if (ret)
 		goto out;
+	// 写寄存器
 	ret = wrmsrl_safe(msr, val);
 out:
 	preempt_enable();
 	return ret;
 }
 
+// x86 kvm msr寄存器相关操作
 int kvm_add_user_return_msr(u32 msr)
 {
 	BUG_ON(kvm_nr_uret_msrs >= KVM_MAX_NR_USER_RETURN_MSRS);
 
+	// kvm 探测该msr寄存器
 	if (kvm_probe_user_return_msr(msr))
 		return -1;
 
@@ -2338,6 +2344,7 @@ static void kvm_vcpu_write_tsc_offset(struct kvm_vcpu *vcpu, u64 offset)
 	vcpu->arch.tsc_offset = static_call(kvm_x86_write_l1_tsc_offset)(vcpu, offset);
 }
 
+// 检查tsc是否稳定
 static inline bool kvm_check_tsc_unstable(void)
 {
 #ifdef CONFIG_X86_64
@@ -8133,6 +8140,7 @@ static struct notifier_block pvclock_gtod_notifier = {
 };
 #endif
 
+// x86 架构kvm init
 int kvm_arch_init(void *opaque)
 {
 	struct kvm_x86_init_ops *ops = opaque;
@@ -8144,11 +8152,13 @@ int kvm_arch_init(void *opaque)
 		goto out;
 	}
 
+	// 1） CPU支持
 	if (!ops->cpu_has_kvm_support()) {
 		pr_err_ratelimited("kvm: no hardware support\n");
 		r = -EOPNOTSUPP;
 		goto out;
 	}
+	// 2) bios是能
 	if (ops->disabled_by_bios()) {
 		pr_err_ratelimited("kvm: disabled by bios\n");
 		r = -EOPNOTSUPP;
@@ -8167,6 +8177,7 @@ int kvm_arch_init(void *opaque)
 	}
 
 	r = -ENOMEM;
+	// FPU
 	x86_fpu_cache = kmem_cache_create("x86_fpu", sizeof(struct fpu),
 					  __alignof__(struct fpu), SLAB_ACCOUNT,
 					  NULL);
@@ -8188,10 +8199,12 @@ int kvm_arch_init(void *opaque)
 	}
 	kvm_nr_uret_msrs = 0;
 
+	// 内存虚拟化初始化
 	r = kvm_mmu_module_init();
 	if (r)
 		goto out_free_percpu;
 
+	// timer初始化
 	kvm_timer_init();
 
 	perf_register_guest_info_callbacks(&kvm_guest_cbs);
@@ -10272,6 +10285,7 @@ void kvm_free_guest_fpu(struct kvm_vcpu *vcpu)
 }
 EXPORT_SYMBOL_GPL(kvm_free_guest_fpu);
 
+// x86预创建vcpu， 检查tsc是否稳定，打印warning
 int kvm_arch_vcpu_precreate(struct kvm *kvm, unsigned int id)
 {
 	if (kvm_check_tsc_unstable() && atomic_read(&kvm->online_vcpus) != 0)
@@ -10281,6 +10295,9 @@ int kvm_arch_vcpu_precreate(struct kvm *kvm, unsigned int id)
 	return 0;
 }
 
+/*
+ * x86创建vcpu
+ */
 int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 {
 	struct page *page;
@@ -10293,10 +10310,12 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 
 	kvm_set_tsc_khz(vcpu, max_tsc_khz);
 
+	// 1） Guest mmu创建
 	r = kvm_mmu_create(vcpu);
 	if (r < 0)
 		return r;
 
+	// 2) 创建该vcpu的lapic
 	if (irqchip_in_kernel(vcpu->kvm)) {
 		r = kvm_create_lapic(vcpu, lapic_timer_advance_ns);
 		if (r < 0)
@@ -10308,6 +10327,7 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 
 	r = -ENOMEM;
 
+	// 分配零页面
 	page = alloc_page(GFP_KERNEL_ACCOUNT | __GFP_ZERO);
 	if (!page)
 		goto fail_free_lapic;
@@ -10361,6 +10381,7 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 	kvm_vcpu_mtrr_init(vcpu);
 	vcpu_load(vcpu);
 	kvm_vcpu_reset(vcpu, false);
+	// 3) 初始化mmu
 	kvm_init_mmu(vcpu, false);
 	vcpu_put(vcpu);
 	return 0;
@@ -10517,6 +10538,7 @@ void kvm_vcpu_deliver_sipi_vector(struct kvm_vcpu *vcpu, u8 vector)
 }
 EXPORT_SYMBOL_GPL(kvm_vcpu_deliver_sipi_vector);
 
+// x86 架构硬件使能KVM
 int kvm_arch_hardware_enable(void)
 {
 	struct kvm *kvm;
@@ -10527,6 +10549,7 @@ int kvm_arch_hardware_enable(void)
 	u64 max_tsc = 0;
 	bool stable, backwards_tsc = false;
 
+	// ??? 这是什么msr上线
 	kvm_user_return_msr_cpu_online();
 	ret = static_call(kvm_x86_hardware_enable)();
 	if (ret != 0)
@@ -10614,6 +10637,7 @@ void kvm_arch_hardware_disable(void)
 	drop_user_return_notifiers();
 }
 
+// x86架构hardware_setup
 int kvm_arch_hardware_setup(void *opaque)
 {
 	struct kvm_x86_init_ops *ops = opaque;
@@ -10624,6 +10648,7 @@ int kvm_arch_hardware_setup(void *opaque)
 	if (boot_cpu_has(X86_FEATURE_XSAVES))
 		rdmsrl(MSR_IA32_XSS, host_xss);
 
+	// 1) x86架构hardware_setup
 	r = ops->hardware_setup();
 	if (r != 0)
 		return r;
@@ -10652,6 +10677,7 @@ int kvm_arch_hardware_setup(void *opaque)
 		kvm_default_tsc_scaling_ratio = 1ULL << kvm_tsc_scaling_ratio_frac_bits;
 	}
 
+	// 2) 
 	kvm_init_msr_list();
 	return 0;
 }
@@ -10661,6 +10687,7 @@ void kvm_arch_hardware_unsetup(void)
 	static_call(kvm_x86_hardware_unsetup)();
 }
 
+// x86 架构CPU兼容性检查
 int kvm_arch_check_processor_compat(void *opaque)
 {
 	struct cpuinfo_x86 *c = &cpu_data(smp_processor_id());

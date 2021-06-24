@@ -281,6 +281,9 @@ struct kvm_mmio_fragment {
 	unsigned len;
 };
 
+/**
+ * 架构无关的vcpu定义
+ */ 
 struct kvm_vcpu {
 	struct kvm *kvm;
 #ifdef CONFIG_PREEMPT_NOTIFIERS
@@ -298,7 +301,7 @@ struct kvm_vcpu {
 	struct list_head blocked_vcpu_list;
 
 	struct mutex mutex;
-	struct kvm_run *run;
+	struct kvm_run *run;		// 1页面
 
 	struct rcuwait wait;
 	struct pid __rcu *pid;
@@ -340,7 +343,7 @@ struct kvm_vcpu {
 #endif
 	bool preempted;
 	bool ready;
-	struct kvm_vcpu_arch arch;
+	struct kvm_vcpu_arch arch;			// cpu 架构相关
 	struct kvm_dirty_ring dirty_ring;
 };
 
@@ -993,6 +996,7 @@ void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu);
 
 void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu);
+// 预创建vcpu:架构相关
 int kvm_arch_vcpu_precreate(struct kvm *kvm, unsigned int id);
 int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu);
 void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu);

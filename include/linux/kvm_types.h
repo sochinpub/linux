@@ -1,8 +1,11 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: GPL-2.0-only 
+* KVM相关数据类型
+*/
 
 #ifndef __KVM_TYPES_H__
 #define __KVM_TYPES_H__
 
+// 前置类型声明
 struct kvm;
 struct kvm_async_pf;
 struct kvm_device_ops;
@@ -33,8 +36,10 @@ enum kvm_mr_change;
  *  hfn - host frame number
  */
 
+// unsigned long和u64的区别?
 typedef unsigned long  gva_t;
 typedef u64            gpa_t;
+// 页帧号
 typedef u64            gfn_t;
 
 #define GPA_INVALID	(~(gpa_t)0)
@@ -45,6 +50,7 @@ typedef u64            hfn_t;
 
 typedef hfn_t kvm_pfn_t;
 
+// 缓存Guest页号到host虚拟地址
 struct gfn_to_hva_cache {
 	u64 generation;
 	gpa_t gpa;
@@ -53,6 +59,7 @@ struct gfn_to_hva_cache {
 	struct kvm_memory_slot *memslot;
 };
 
+// 缓存Guest页号到
 struct gfn_to_pfn_cache {
 	u64 generation;
 	gfn_t gfn;

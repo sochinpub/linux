@@ -13,6 +13,7 @@ struct kvm_vcpu;
  * kvm_io_device_ops are called under kvm slots_lock.
  * read and write handlers return 0 if the transaction has been handled,
  * or non-zero to have it passed to the next device.
+ * IO 设备读写的回调函数
  **/
 struct kvm_io_device_ops {
 	int (*read)(struct kvm_vcpu *vcpu,
@@ -27,18 +28,19 @@ struct kvm_io_device_ops {
 		     const void *val);
 	void (*destructor)(struct kvm_io_device *this);
 };
-
-
+// 定义IO设备
 struct kvm_io_device {
 	const struct kvm_io_device_ops *ops;
 };
 
+// 初始化操作结合
 static inline void kvm_iodevice_init(struct kvm_io_device *dev,
 				     const struct kvm_io_device_ops *ops)
 {
 	dev->ops = ops;
 }
 
+// read
 static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
 				    struct kvm_io_device *dev, gpa_t addr,
 				    int l, void *v)
@@ -47,6 +49,7 @@ static inline int kvm_iodevice_read(struct kvm_vcpu *vcpu,
 				: -EOPNOTSUPP;
 }
 
+// write
 static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
 				     struct kvm_io_device *dev, gpa_t addr,
 				     int l, const void *v)
@@ -55,6 +58,7 @@ static inline int kvm_iodevice_write(struct kvm_vcpu *vcpu,
 				 : -EOPNOTSUPP;
 }
 
+// destructor
 static inline void kvm_iodevice_destructor(struct kvm_io_device *dev)
 {
 	if (dev->ops->destructor)
