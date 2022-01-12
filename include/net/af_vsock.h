@@ -15,7 +15,7 @@
 #include "vsock_addr.h"
 
 #define LAST_RESERVED_PORT 1023
-
+//
 #define VSOCK_HASH_SIZE         251
 extern struct list_head vsock_bind_table[VSOCK_HASH_SIZE + 1];
 extern struct list_head vsock_connected_table[VSOCK_HASH_SIZE];
@@ -27,12 +27,12 @@ extern spinlock_t vsock_table_lock;
 struct vsock_sock {
 	/* sk must be the first member. */
 	struct sock sk;
-	const struct vsock_transport *transport;
-	struct sockaddr_vm local_addr;
-	struct sockaddr_vm remote_addr;
+	const struct vsock_transport *transport; // transport层
+	struct sockaddr_vm local_addr;			 // 本地sock地址
+	struct sockaddr_vm remote_addr;			 // 远端sock地址
 	/* Links for the global tables of bound and connected sockets. */
-	struct list_head bound_table;
-	struct list_head connected_table;
+	struct list_head bound_table;			// 绑定的sock链表
+	struct list_head connected_table;		// 建连的链表
 	/* Accessed without the socket lock held. This means it can never be
 	 * modified outsided of socket create or destruct.
 	 */
@@ -41,11 +41,11 @@ struct vsock_sock {
 					 * cached peer?
 					 */
 	u32 cached_peer;  /* Context ID of last dgram destination check. */
-	const struct cred *owner;
-	/* Rest are SOCK_STREAM only. */
-	long connect_timeout;
+	const struct cred *owner;			// 安全上下文
+	/* Rest are SOCK_STREAM only.  stream相关*/
+	long connect_timeout;				// 连接超时时间
 	/* Listening socket that this came from. */
-	struct sock *listener;
+	struct sock *listener;				// 监听的sock
 	/* Used for pending list and accept queue during connection handshake.
 	 * The listening socket is the head for both lists.  Sockets created
 	 * for connection requests are placed in the pending list until they
@@ -53,9 +53,10 @@ struct vsock_sock {
 	 * so they can be accepted in accept().  If accept() cannot accept the
 	 * connection, it is marked as rejected so the cleanup function knows
 	 * to clean up the socket.
+	 * 握手阶段的队列，头部都是监听socket
 	 */
-	struct list_head pending_links;
-	struct list_head accept_queue;
+	struct list_head pending_links;		// 连接请求，未握手成功
+	struct list_head accept_queue;		// 连接建立，握手层高
 	bool rejected;
 	struct delayed_work connect_work;
 	struct delayed_work pending_work;

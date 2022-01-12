@@ -1610,6 +1610,7 @@ err_setup:
  * Registers the given driver with Linux through the 'driver_register()' call
  * and sets up the hyper-v vmbus handling for this driver.
  * It will return the state of the 'driver_register()' call.
+ * vm bus驱动注册
  *
  */
 int __vmbus_driver_register(struct hv_driver *hv_driver, struct module *owner, const char *mod_name)

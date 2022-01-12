@@ -10,8 +10,15 @@
 
 #include <uapi/linux/vm_sockets.h>
 
+/**
+ * vsock addr支持
+ */
+
+// 初始化一个vsock地址
 void vsock_addr_init(struct sockaddr_vm *addr, u32 cid, u32 port);
+// 校验vsock地址
 int vsock_addr_validate(const struct sockaddr_vm *addr);
+//
 bool vsock_addr_bound(const struct sockaddr_vm *addr);
 void vsock_addr_unbind(struct sockaddr_vm *addr);
 bool vsock_addr_equals_addr(const struct sockaddr_vm *addr,

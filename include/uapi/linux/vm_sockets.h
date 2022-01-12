@@ -24,6 +24,7 @@
  * setsockopt(3) or getsockopt(3) to set or get an unsigned long long that
  * specifies the size of the buffer underlying a vSockets STREAM socket.
  * Value is clamped to the MIN and MAX.
+ * setsockopt使用，设置vsock的缓冲区大小
  */
 
 #define SO_VM_SOCKETS_BUFFER_SIZE 0
@@ -32,6 +33,7 @@
  * in setsockopt(3) or getsockopt(3) to set or get an unsigned long long that
  * specifies the minimum size allowed for the buffer underlying a vSockets
  * STREAM socket.
+ * setsockopt设置vsock的最小缓冲区大小
  */
 
 #define SO_VM_SOCKETS_BUFFER_MIN_SIZE 1
@@ -40,6 +42,7 @@
  * in setsockopt(3) or getsockopt(3) to set or get an unsigned long long
  * that specifies the maximum size allowed for the buffer underlying a
  * vSockets STREAM socket.
+ * setsockopt设置vsock的最大缓冲区大小
  */
 
 #define SO_VM_SOCKETS_BUFFER_MAX_SIZE 2
@@ -48,6 +51,7 @@
  * in getsockopt(3) to get a host-specific identifier for the peer endpoint's
  * VM.  The identifier is a signed integer.
  * Only available for hypervisor endpoints.
+ * getsockopt获取主机指定的对端VM ID
  */
 
 #define SO_VM_SOCKETS_PEER_HOST_VM_ID 3
@@ -55,6 +59,7 @@
 /* Option name for determining if a socket is trusted.  Use as the option name
  * in getsockopt(3) to determine if a socket is trusted.  The value is a
  * signed integer.
+ * getsockopt获取vsock是否是可信的
  */
 
 #define SO_VM_SOCKETS_TRUSTED 5
@@ -62,6 +67,7 @@
 /* Option name for STREAM socket connection timeout.  Use as the option name
  * in setsockopt(3) or getsockopt(3) to set or get the connection
  * timeout for a STREAM socket.
+ * setsockopt设置vsock连接的连接超时时间 ???
  */
 
 #define SO_VM_SOCKETS_CONNECT_TIMEOUT 6
@@ -77,18 +83,21 @@
  * It is not to be confused with conventional non-blocking socket operations.
  *
  * Only available for hypervisor endpoints.
+ * setsockopt设置vsock非阻塞，决定send和recv的非阻塞行为
  */
 
 #define SO_VM_SOCKETS_NONBLOCK_TXRX 7
 
 /* The vSocket equivalent of INADDR_ANY.  This works for the svm_cid field of
  * sockaddr_vm and indicates the context ID of the current endpoint.
+ * vsock绑定任意cid地址
  */
 
 #define VMADDR_CID_ANY -1U
 
 /* Bind to any available port.  Works for the svm_port field of
  * sockaddr_vm.
+ * vsock绑定任意端口
  */
 
 #define VMADDR_PORT_ANY -1U
@@ -96,6 +105,7 @@
 /* Use this as the destination CID in an address when referring to the
  * hypervisor.  VMCI relies on it being 0, but this would be useful for other
  * transports too.
+ * vsock目的cid为hypervisor
  */
 
 #define VMADDR_CID_HYPERVISOR 0
@@ -104,6 +114,7 @@
  * local communication (loopback).
  * (This was VMADDR_CID_RESERVED, but even VMCI doesn't use it anymore,
  * it was a legacy value from an older release).
+ * vsock cid为1，代表loopback地址
  */
 
 #define VMADDR_CID_LOCAL 1
@@ -111,6 +122,7 @@
 /* Use this as the destination CID in an address when referring to the host
  * (any process other than the hypervisor).  VMCI relies on it being 2, but
  * this would be useful for other transports too.
+ * vsock cid为2代表宿主机上任何非hypervisor的地址
  */
 
 #define VMADDR_CID_HOST 2
@@ -119,6 +131,7 @@
  * local vsock communication between guest and host and nested VMs setup.
  * In addition to this, implicitly, the vsock packets are forwarded to the host
  * if no host->guest vsock transport is set.
+ *
  *
  * Set this flag value in the sockaddr_vm corresponding field if the vsock
  * packets need to be always forwarded to the host. Using this behavior,
@@ -135,12 +148,16 @@
  */
 #define VMADDR_FLAG_TO_HOST 0x01
 
-/* Invalid vSockets version. */
+/* Invalid vSockets version.
+ * vsock版本非法
+ * */
 
 #define VM_SOCKETS_INVALID_VERSION -1U
 
 /* The epoch (first) component of the vSockets version.  A single byte
  * representing the epoch component of the vSockets version.
+ * 获取单字节的epoch版本号
+ *
  */
 
 #define VM_SOCKETS_VERSION_EPOCH(_v) (((_v) & 0xFF000000) >> 24)
@@ -148,12 +165,14 @@
 /* The major (second) component of the vSockets version.   A single byte
  * representing the major component of the vSockets version.  Typically
  * changes for every major release of a product.
+ * 获取单字节的major版本号
  */
 
 #define VM_SOCKETS_VERSION_MAJOR(_v) (((_v) & 0x00FF0000) >> 16)
 
 /* The minor (third) component of the vSockets version.  Two bytes representing
  * the minor component of the vSockets version.
+ * 获取双字节的min版本号
  */
 
 #define VM_SOCKETS_VERSION_MINOR(_v) (((_v) & 0x0000FFFF))
@@ -162,15 +181,16 @@
  * AF_VSOCK.  The structure members should all align on their natural
  * boundaries without resorting to compiler packing directives.  The total size
  * of this structure should be exactly the same as that of struct sockaddr.
+ * vsock地址结构，地址族为AF_VSOCK。结构体大小等于sockaddr
  */
 
 struct sockaddr_vm {
-	__kernel_sa_family_t svm_family;
+	__kernel_sa_family_t svm_family;		// 协议族
 	unsigned short svm_reserved1;
-	unsigned int svm_port;
-	unsigned int svm_cid;
-	__u8 svm_flags;
-	unsigned char svm_zero[sizeof(struct sockaddr) -
+	unsigned int svm_port;					// 端口号
+	unsigned int svm_cid;					// cid
+	__u8 svm_flags;							// flags
+	unsigned char svm_zero[sizeof(struct sockaddr) -		// padding
 			       sizeof(sa_family_t) -
 			       sizeof(unsigned short) -
 			       sizeof(unsigned int) -

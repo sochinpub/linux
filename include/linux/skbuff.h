@@ -611,6 +611,7 @@ typedef unsigned char *sk_buff_data_t;
 #endif
 
 /**
+ * socket 缓冲区
  *	struct sk_buff - socket buffer
  *	@next: Next buffer in list
  *	@prev: Previous buffer in list

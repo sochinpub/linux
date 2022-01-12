@@ -706,7 +706,7 @@ static struct virtio_driver virtio_vsock_driver = {
 	.probe = virtio_vsock_probe,
 	.remove = virtio_vsock_remove,
 };
-
+// virtio vsock初始化
 static int __init virtio_vsock_init(void)
 {
 	int ret;

@@ -9,54 +9,89 @@
  *
  * - There are two kinds of sockets: those created by user action (such as
  * calling socket(2)) and those created by incoming connection request packets.
+ * socket创建；新入连接创建
  *
  * - There are two "global" tables, one for bound sockets (sockets that have
  * specified an address that they are responsible for) and one for connected
  * sockets (sockets that have established a connection with another socket).
+ * 两个全局的tables，一个给绑定到特定地址的socket，一个给已经建立连接的socket。
  * These tables are "global" in that all sockets on the system are placed
- * within them. - Note, though, that the bound table contains an extra entry
+ * within them.
+ * tables是全局，系统所有的sockets都放在里面。
+ * - Note, though, that the bound table contains an extra entry
  * for a list of unbound sockets and SOCK_DGRAM sockets will always remain in
- * that list. The bound table is used solely for lookup of sockets when packets
+ * that list.
+ *
+ * The bound table is used solely for lookup of sockets when packets
  * are received and that's not necessary for SOCK_DGRAM sockets since we create
- * a datagram handle for each and need not perform a lookup.  Keeping SOCK_DGRAM
+ * a datagram handle for each and need not perform a lookup.
+ * 绑定地址的table被用来收到包后进行socket查找。在SOCK_DGRAM socket中不太需要，
+ * 以为已经为每一个datagram创建了一个handle，不需要查找相应的socket。
+ * Keeping SOCK_DGRAM
  * sockets out of the bound hash buckets will reduce the chance of collisions
  * when looking for SOCK_STREAM sockets and prevents us from having to check the
  * socket type in the hash table lookups.
+ * 未绑定的sockets会减少冲突的概率，当查找SOCK_STREAM sockets时，能组织我们在检查socket type
+ * 时的hash表查找冲突。
  *
  * - Sockets created by user action will either be "client" sockets that
  * initiate a connection or "server" sockets that listen for connections; we do
  * not support simultaneous connects (two "client" sockets connecting).
+ * 用户创建的socket要么是client端初始化连接的socket，要么是server端监听的socket。
+ * 不支持两个client 同时连接sockets ???
  *
  * - "Server" sockets are referred to as listener sockets throughout this
- * implementation because they are in the TCP_LISTEN state.  When a
+ * implementation because they are in the TCP_LISTEN state.
+ * server sockets被指定为监听sockets，这些sockets始终在TCP_LISTEN状态
+ * When a
  * connection request is received (the second kind of socket mentioned above),
- * we create a new socket and refer to it as a pending socket.  These pending
+ * we create a new socket and refer to it as a pending socket.
+ *
+ * 当一个连接请求收到，创建一个新的socket，指代为排队的socket。
+ *   These pending
  * sockets are placed on the pending connection list of the listener socket.
+ * 这些排队的sockets被放在监听sockets的排队连接列表上。
+ *
  * When future packets are received for the address the listener socket is
  * bound to, we check if the source of the packet is from one that has an
- * existing pending connection.  If it does, we process the packet for the
+ * existing pending connection.
+ * 当有包到来监听的socket时，检查包的源头是否来自于一个已经排队连接的sockets。
+ *
+ * If it does, we process the packet for the
  * pending socket.  When that socket reaches the connected state, it is removed
  * from the listener socket's pending list and enqueued in the listener
- * socket's accept queue.  Callers of accept(2) will accept connected sockets
+ * socket's accept queue.
+ * 监听socket会处理排队socket的包，当该连接到达连接状态后，从监听socket的列表中删除。
+ * Callers of accept(2) will accept connected sockets
  * from the listener socket's accept queue.  If the socket cannot be accepted
  * for some reason then it is marked rejected.  Once the connection is
  * accepted, it is owned by the user process and the responsibility for cleanup
  * falls with that user process.
+ * 调用accept后，监听socket队列的连接socket会转给调用者的用户进程，用户进程自己负责清理
+ * accept后的socket
  *
  * - It is possible that these pending sockets will never reach the connected
  * state; in fact, we may never receive another packet after the connection
- * request.  Because of this, we must schedule a cleanup function to run in the
+ * request.
+ * 监听socket上配对的sockets可能用于不进入连接状态，因为未收到连接请求的后续包。
+ * Because of this, we must schedule a cleanup function to run in the
  * future, after some amount of time passes where a connection should have been
- * established.  This function ensures that the socket is off all lists so it
+ * established.
+ * 因此，要有一个控制时间的机制，安排一个清理函数清理这类排队的socket。
+ *  This function ensures that the socket is off all lists so it
  * cannot be retrieved, then drops all references to the socket so it is cleaned
  * up (sock_put() -> sk_free() -> our sk_destruct implementation).  Note this
  * function will also cleanup rejected sockets, those that reach the connected
  * state but leave it before they have been accepted.
+ * 清理函数保证，将该类socket从所有立案表中移除，后续走清理流程。
+ *
  *
  * - Lock ordering for pending or accept queue sockets is:
  *
  *     lock_sock(listener);
  *     lock_sock_nested(pending, SINGLE_DEPTH_NESTING);
+ *
+ * 加锁顺序，监听->排队
  *
  * Using explicit nested locking keeps lockdep happy since normally only one
  * lock of a given class may be taken at a time.
@@ -66,15 +101,20 @@
  * implementation will perform some cleanup then drop the last reference so our
  * sk_destruct implementation is invoked.  Our sk_destruct implementation will
  * perform additional cleanup that's common for both types of sockets.
+ * 用户创建的socket，用户调用close释放，触发到内核的释放函数实现。这里实现为一些清理动作，并
+ * 释放最后的索引，随后sk_destruction实现被触发调用。
  *
  * - A socket's reference count is what ensures that the structure won't be
  * freed.  Each entry in a list (such as the "global" bound and connected tables
  * and the listener socket's pending list and connected queue) ensures a
- * reference.  When we defer work until process context and pass a socket as our
+ * reference.
+ * socket的引用保证了不会被无故释放，例如全局绑定和连接table里面的socket都会加一次引用
+ * When we defer work until process context and pass a socket as our
  * argument, we must ensure the reference count is increased to ensure the
  * socket isn't freed before the function is run; the deferred function will
  * then drop the reference.
  *
+ * sk->sk_state使用了TCP的状态常量，用户态同样可以用。
  * - sk->sk_state uses the TCP state constants because they are widely used by
  * other address families and exposed to userspace tools like ss(8):
  *
@@ -114,7 +154,7 @@ static int __vsock_bind(struct sock *sk, struct sockaddr_vm *addr);
 static void vsock_sk_destruct(struct sock *sk);
 static int vsock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb);
 
-/* Protocol family. */
+/* Protocol family. 当前协议族*/
 static struct proto vsock_proto = {
 	.name = "AF_VSOCK",
 	.owner = THIS_MODULE,
@@ -123,21 +163,22 @@ static struct proto vsock_proto = {
 
 /* The default peer timeout indicates how long we will wait for a peer response
  * to a control message.
+ * 控制消息超时时间
  */
 #define VSOCK_DEFAULT_CONNECT_TIMEOUT (2 * HZ)
 
-#define VSOCK_DEFAULT_BUFFER_SIZE     (1024 * 256)
-#define VSOCK_DEFAULT_BUFFER_MAX_SIZE (1024 * 256)
-#define VSOCK_DEFAULT_BUFFER_MIN_SIZE 128
+#define VSOCK_DEFAULT_BUFFER_SIZE     (1024 * 256) // 默认vsock缓冲区大小256KB
+#define VSOCK_DEFAULT_BUFFER_MAX_SIZE (1024 * 256) // 默认的最大缓冲区大小256KB
+#define VSOCK_DEFAULT_BUFFER_MIN_SIZE 128		   // 默认的最小缓冲区大小128B
 
 /* Transport used for host->guest communication */
-static const struct vsock_transport *transport_h2g;
+static const struct vsock_transport *transport_h2g;			// host->Guest的传输
 /* Transport used for guest->host communication */
-static const struct vsock_transport *transport_g2h;
+static const struct vsock_transport *transport_g2h;			// guest->host的传输
 /* Transport used for DGRAM communication */
-static const struct vsock_transport *transport_dgram;
+static const struct vsock_transport *transport_dgram;		// dgram通信
 /* Transport used for local communication */
-static const struct vsock_transport *transport_local;
+static const struct vsock_transport *transport_local;		// local传输
 static DEFINE_MUTEX(vsock_register_mutex);
 
 /**** UTILS ****/
@@ -158,26 +199,31 @@ static DEFINE_MUTEX(vsock_register_mutex);
  */
 #define MAX_PORT_RETRIES        24
 
-#define VSOCK_HASH(addr)        ((addr)->svm_port % VSOCK_HASH_SIZE)
-#define vsock_bound_sockets(addr) (&vsock_bind_table[VSOCK_HASH(addr)])
-#define vsock_unbound_sockets     (&vsock_bind_table[VSOCK_HASH_SIZE])
+#define VSOCK_HASH(addr)        ((addr)->svm_port % VSOCK_HASH_SIZE)    // hash根据port进行取余
+#define vsock_bound_sockets(addr) (&vsock_bind_table[VSOCK_HASH(addr)]) // bound在链表
+#define vsock_unbound_sockets     (&vsock_bind_table[VSOCK_HASH_SIZE])	// unbound是bind的尾部链表
 
 /* XXX This can probably be implemented in a better way. */
+// hash函数，冲突概率较大
 #define VSOCK_CONN_HASH(src, dst)				\
 	(((src)->svm_cid ^ (dst)->svm_port) % VSOCK_HASH_SIZE)
+// 根据src的cid和dst的port，查找连接socket
 #define vsock_connected_sockets(src, dst)		\
 	(&vsock_connected_table[VSOCK_CONN_HASH(src, dst)])
 #define vsock_connected_sockets_vsk(vsk)				\
 	vsock_connected_sockets(&(vsk)->remote_addr, &(vsk)->local_addr)
-
+// 监听socket的hash表
 struct list_head vsock_bind_table[VSOCK_HASH_SIZE + 1];
 EXPORT_SYMBOL_GPL(vsock_bind_table);
+// 连接socket的hash表
 struct list_head vsock_connected_table[VSOCK_HASH_SIZE];
 EXPORT_SYMBOL_GPL(vsock_connected_table);
+// vsock table的自旋锁
 DEFINE_SPINLOCK(vsock_table_lock);
 EXPORT_SYMBOL_GPL(vsock_table_lock);
 
 /* Autobind this socket to the local address if necessary. */
+// 自动绑定到local any地址
 static int vsock_auto_bind(struct vsock_sock *vsk)
 {
 	struct sock *sk = sk_vsock(vsk);
@@ -188,7 +234,7 @@ static int vsock_auto_bind(struct vsock_sock *vsk)
 	vsock_addr_init(&local_addr, VMADDR_CID_ANY, VMADDR_PORT_ANY);
 	return __vsock_bind(sk, &local_addr);
 }
-
+// vsock初始化table
 static void vsock_init_tables(void)
 {
 	int i;
@@ -199,50 +245,50 @@ static void vsock_init_tables(void)
 	for (i = 0; i < ARRAY_SIZE(vsock_connected_table); i++)
 		INIT_LIST_HEAD(&vsock_connected_table[i]);
 }
-
+// 加引用，并插入到链表中
 static void __vsock_insert_bound(struct list_head *list,
 				 struct vsock_sock *vsk)
 {
 	sock_hold(&vsk->sk);
 	list_add(&vsk->bound_table, list);
 }
-
+// 插入到连接的table中
 static void __vsock_insert_connected(struct list_head *list,
 				     struct vsock_sock *vsk)
 {
 	sock_hold(&vsk->sk);
 	list_add(&vsk->connected_table, list);
 }
-
+// 从监听socket链表中移除，同时减引用
 static void __vsock_remove_bound(struct vsock_sock *vsk)
 {
 	list_del_init(&vsk->bound_table);
 	sock_put(&vsk->sk);
 }
-
+// 从连接table中移除
 static void __vsock_remove_connected(struct vsock_sock *vsk)
 {
 	list_del_init(&vsk->connected_table);
 	sock_put(&vsk->sk);
 }
-
+// 从建链的socket链表中查找
 static struct sock *__vsock_find_bound_socket(struct sockaddr_vm *addr)
 {
 	struct vsock_sock *vsk;
 
 	list_for_each_entry(vsk, vsock_bound_sockets(addr), bound_table) {
-		if (vsock_addr_equals_addr(addr, &vsk->local_addr))
+		if (vsock_addr_equals_addr(addr, &vsk->local_addr)) // 地址是否相同
 			return sk_vsock(vsk);
 
 		if (addr->svm_port == vsk->local_addr.svm_port &&
 		    (vsk->local_addr.svm_cid == VMADDR_CID_ANY ||
-		     addr->svm_cid == VMADDR_CID_ANY))
+		     addr->svm_cid == VMADDR_CID_ANY)) // 如果port相同，cid匹配ANY
 			return sk_vsock(vsk);
 	}
 
 	return NULL;
 }
-
+// 在连接table中查找socket
 static struct sock *__vsock_find_connected_socket(struct sockaddr_vm *src,
 						  struct sockaddr_vm *dst)
 {
@@ -258,14 +304,14 @@ static struct sock *__vsock_find_connected_socket(struct sockaddr_vm *src,
 
 	return NULL;
 }
-
+// 插入到unbound的监听table中
 static void vsock_insert_unbound(struct vsock_sock *vsk)
 {
 	spin_lock_bh(&vsock_table_lock);
 	__vsock_insert_bound(vsock_unbound_sockets, vsk);
 	spin_unlock_bh(&vsock_table_lock);
 }
-
+// 插入到连接的table中
 void vsock_insert_connected(struct vsock_sock *vsk)
 {
 	struct list_head *list = vsock_connected_sockets(
@@ -294,7 +340,7 @@ void vsock_remove_connected(struct vsock_sock *vsk)
 	spin_unlock_bh(&vsock_table_lock);
 }
 EXPORT_SYMBOL_GPL(vsock_remove_connected);
-
+// 加锁查找
 struct sock *vsock_find_bound_socket(struct sockaddr_vm *addr)
 {
 	struct sock *sk;
@@ -309,7 +355,7 @@ struct sock *vsock_find_bound_socket(struct sockaddr_vm *addr)
 	return sk;
 }
 EXPORT_SYMBOL_GPL(vsock_find_bound_socket);
-
+// 加锁查找
 struct sock *vsock_find_connected_socket(struct sockaddr_vm *src,
 					 struct sockaddr_vm *dst)
 {
@@ -325,14 +371,14 @@ struct sock *vsock_find_connected_socket(struct sockaddr_vm *src,
 	return sk;
 }
 EXPORT_SYMBOL_GPL(vsock_find_connected_socket);
-
+//
 void vsock_remove_sock(struct vsock_sock *vsk)
 {
 	vsock_remove_bound(vsk);
 	vsock_remove_connected(vsk);
 }
 EXPORT_SYMBOL_GPL(vsock_remove_sock);
-
+// 对每个连接的socket执行回调
 void vsock_for_each_connected_socket(void (*fn)(struct sock *sk))
 {
 	int i;
@@ -349,7 +395,7 @@ void vsock_for_each_connected_socket(void (*fn)(struct sock *sk))
 	spin_unlock_bh(&vsock_table_lock);
 }
 EXPORT_SYMBOL_GPL(vsock_for_each_connected_socket);
-
+// 新连接请求排队
 void vsock_add_pending(struct sock *listener, struct sock *pending)
 {
 	struct vsock_sock *vlistener;
@@ -358,7 +404,7 @@ void vsock_add_pending(struct sock *listener, struct sock *pending)
 	vlistener = vsock_sk(listener);
 	vpending = vsock_sk(pending);
 
-	sock_hold(pending);
+	sock_hold(pending); // 加引用
 	sock_hold(listener);
 	list_add_tail(&vpending->pending_links, &vlistener->pending_links);
 }
@@ -373,7 +419,7 @@ void vsock_remove_pending(struct sock *listener, struct sock *pending)
 	sock_put(pending);
 }
 EXPORT_SYMBOL_GPL(vsock_remove_pending);
-
+// 加入到accept队列
 void vsock_enqueue_accept(struct sock *listener, struct sock *connected)
 {
 	struct vsock_sock *vlistener;
@@ -387,7 +433,7 @@ void vsock_enqueue_accept(struct sock *listener, struct sock *connected)
 	list_add_tail(&vconnected->accept_queue, &vlistener->accept_queue);
 }
 EXPORT_SYMBOL_GPL(vsock_enqueue_accept);
-
+// cid判断，决策是否使用local transport
 static bool vsock_use_local_transport(unsigned int remote_cid)
 {
 	if (!transport_local)
@@ -402,28 +448,32 @@ static bool vsock_use_local_transport(unsigned int remote_cid)
 		return remote_cid == VMADDR_CID_HOST;
 	}
 }
-
+// transport层销毁
 static void vsock_deassign_transport(struct vsock_sock *vsk)
 {
 	if (!vsk->transport)
 		return;
 
 	vsk->transport->destruct(vsk);
-	module_put(vsk->transport->module);
+	module_put(vsk->transport->module); // 减module引用
 	vsk->transport = NULL;
 }
 
 /* Assign a transport to a socket and call the .init transport callback.
- *
+ * 给socket动态赋值transport
  * Note: for stream socket this must be called when vsk->remote_addr is set
  * (e.g. during the connect() or when a connection request on a listener
  * socket is received).
+ * client的remote地址设置后，要理解设置transport；
+ * server监听收到新的连接请求，要立即设置transport
  * The vsk->remote_addr is used to decide which transport to use:
+ * 利用remote_addr来决定使用的transport
  *  - remote CID == VMADDR_CID_LOCAL or g2h->local_cid or VMADDR_CID_HOST if
  *    g2h is not loaded, will use local transport;
  *  - remote CID <= VMADDR_CID_HOST or h2g is not loaded or remote flags field
  *    includes VMADDR_FLAG_TO_HOST flag value, will use guest->host transport;
  *  - remote CID > VMADDR_CID_HOST will use host->guest transport;
+ *  ???
  */
 int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 {
@@ -495,22 +545,22 @@ int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(vsock_assign_transport);
-
+// vsock绑定
 bool vsock_find_cid(unsigned int cid)
 {
-	if (transport_g2h && cid == transport_g2h->get_local_cid())
+	if (transport_g2h && cid == transport_g2h->get_local_cid())	//
 		return true;
 
-	if (transport_h2g && cid == VMADDR_CID_HOST)
+	if (transport_h2g && cid == VMADDR_CID_HOST)	// 绑定到host cid
 		return true;
 
-	if (transport_local && cid == VMADDR_CID_LOCAL)
+	if (transport_local && cid == VMADDR_CID_LOCAL) // 绑定到local cid
 		return true;
 
 	return false;
 }
 EXPORT_SYMBOL_GPL(vsock_find_cid);
-
+//出队一个sock, accept队列
 static struct sock *vsock_dequeue_accept(struct sock *listener)
 {
 	struct vsock_sock *vlistener;
@@ -524,6 +574,7 @@ static struct sock *vsock_dequeue_accept(struct sock *listener)
 	vconnected = list_entry(vlistener->accept_queue.next,
 				struct vsock_sock, accept_queue);
 
+	// 出队
 	list_del_init(&vconnected->accept_queue);
 	sock_put(listener);
 	/* The caller will need a reference on the connected socket so we let
@@ -603,20 +654,21 @@ out:
 }
 
 /**** SOCKET OPERATIONS ****/
-
+// stream绑定
 static int __vsock_bind_stream(struct vsock_sock *vsk,
 			       struct sockaddr_vm *addr)
 {
-	static u32 port;
+	static u32 port; // 静态变量，只绑定一次
 	struct sockaddr_vm new_addr;
 
+	// 随机分配1个1024以上的port
 	if (!port)
 		port = LAST_RESERVED_PORT + 1 +
 			prandom_u32_max(U32_MAX - LAST_RESERVED_PORT);
 
-	vsock_addr_init(&new_addr, addr->svm_cid, addr->svm_port);
+	vsock_addr_init(&new_addr, addr->svm_cid, addr->svm_port);	// 初始化vsock地址族
 
-	if (addr->svm_port == VMADDR_PORT_ANY) {
+	if (addr->svm_port == VMADDR_PORT_ANY) { // 绑定所有端口
 		bool found = false;
 		unsigned int i;
 
@@ -634,7 +686,7 @@ static int __vsock_bind_stream(struct vsock_sock *vsk,
 
 		if (!found)
 			return -EADDRNOTAVAIL;
-	} else {
+	} else { // 绑定到特定端口
 		/* If port is in reserved range, ensure caller
 		 * has necessary privileges.
 		 */
@@ -654,17 +706,17 @@ static int __vsock_bind_stream(struct vsock_sock *vsk,
 	 * extra entry at the end of the hash table, a trick used by AF_UNIX.
 	 */
 	__vsock_remove_bound(vsk);
-	__vsock_insert_bound(vsock_bound_sockets(&vsk->local_addr), vsk);
+	__vsock_insert_bound(vsock_bound_sockets(&vsk->local_addr), vsk); // 插入到连table中
 
 	return 0;
 }
-
+// dgram绑定
 static int __vsock_bind_dgram(struct vsock_sock *vsk,
 			      struct sockaddr_vm *addr)
 {
-	return vsk->transport->dgram_bind(vsk, addr);
+	return vsk->transport->dgram_bind(vsk, addr);	// 取决于特定的transport实现
 }
-
+// vsock绑定地址
 static int __vsock_bind(struct sock *sk, struct sockaddr_vm *addr)
 {
 	struct vsock_sock *vsk = vsock_sk(sk);
@@ -678,13 +730,14 @@ static int __vsock_bind(struct sock *sk, struct sockaddr_vm *addr)
 	 * none are provided (VMADDR_CID_ANY and VMADDR_PORT_ANY).  Note that
 	 * like AF_INET prevents binding to a non-local IP address (in most
 	 * cases), we only allow binding to a local CID.
+	 * 绑定到提供的地址上（默认绑定到ANY上），只允许绑定到local的CID上
 	 */
 	if (addr->svm_cid != VMADDR_CID_ANY && !vsock_find_cid(addr->svm_cid))
 		return -EADDRNOTAVAIL;
 
 	switch (sk->sk_socket->type) {
 	case SOCK_STREAM:
-		spin_lock_bh(&vsock_table_lock);
+		spin_lock_bh(&vsock_table_lock);			// 锁
 		retval = __vsock_bind_stream(vsk, addr);
 		spin_unlock_bh(&vsock_table_lock);
 		break;
@@ -767,7 +820,7 @@ static struct sock *__vsock_create(struct net *net,
 
 	return sk;
 }
-
+// 释放
 static void __vsock_release(struct sock *sk, int level)
 {
 	if (sk) {
@@ -783,19 +836,19 @@ static void __vsock_release(struct sock *sk, int level)
 		 * is the same as lock_sock(sk).
 		 */
 		lock_sock_nested(sk, level);
-
+		// 先释放transport
 		if (vsk->transport)
 			vsk->transport->release(vsk);
-		else if (sk->sk_type == SOCK_STREAM)
+		else if (sk->sk_type == SOCK_STREAM) // stream需要先移除vsock
 			vsock_remove_sock(vsk);
 
 		sock_orphan(sk);
 		sk->sk_shutdown = SHUTDOWN_MASK;
 
-		skb_queue_purge(&sk->sk_receive_queue);
+		skb_queue_purge(&sk->sk_receive_queue); // 销毁接收队列
 
 		/* Clean up any sockets that never were accepted. */
-		while ((pending = vsock_dequeue_accept(sk)) != NULL) {
+		while ((pending = vsock_dequeue_accept(sk)) != NULL) { // 没有接收的所有socket需要释放
 			__vsock_release(pending, SINGLE_DEPTH_NESTING);
 			sock_put(pending);
 		}
@@ -804,7 +857,7 @@ static void __vsock_release(struct sock *sk, int level)
 		sock_put(sk);
 	}
 }
-
+// 销毁vsock
 static void vsock_sk_destruct(struct sock *sk)
 {
 	struct vsock_sock *vsk = vsock_sk(sk);
@@ -817,9 +870,9 @@ static void vsock_sk_destruct(struct sock *sk)
 	vsock_addr_init(&vsk->local_addr, VMADDR_CID_ANY, VMADDR_PORT_ANY);
 	vsock_addr_init(&vsk->remote_addr, VMADDR_CID_ANY, VMADDR_PORT_ANY);
 
-	put_cred(vsk->owner);
+	put_cred(vsk->owner); // 认证销毁
 }
-
+// vsock收包
 static int vsock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int err;
@@ -920,7 +973,7 @@ out:
 	release_sock(sk);
 	return err;
 }
-
+// 关闭vsock
 static int vsock_shutdown(struct socket *sock, int mode)
 {
 	int err;
@@ -1088,7 +1141,7 @@ static __poll_t vsock_poll(struct file *file, struct socket *sock,
 
 	return mask;
 }
-
+// vsock dgram发送msg
 static int vsock_dgram_sendmsg(struct socket *sock, struct msghdr *msg,
 			       size_t len)
 {
@@ -1162,7 +1215,7 @@ out:
 	release_sock(sk);
 	return err;
 }
-
+// udp connect
 static int vsock_dgram_connect(struct socket *sock,
 			       struct sockaddr *addr, int addr_len, int flags)
 {
@@ -1174,7 +1227,7 @@ static int vsock_dgram_connect(struct socket *sock,
 	sk = sock->sk;
 	vsk = vsock_sk(sk);
 
-	err = vsock_addr_cast(addr, addr_len, &remote_addr);
+	err = vsock_addr_cast(addr, addr_len, &remote_addr); // 连接的远程addr
 	if (err == -EAFNOSUPPORT && remote_addr->svm_family == AF_UNSPEC) {
 		lock_sock(sk);
 		vsock_addr_init(&vsk->remote_addr, VMADDR_CID_ANY,
@@ -1187,12 +1240,12 @@ static int vsock_dgram_connect(struct socket *sock,
 
 	lock_sock(sk);
 
-	err = vsock_auto_bind(vsk);
+	err = vsock_auto_bind(vsk); // udp绑定到any地址
 	if (err)
 		goto out;
 
 	if (!vsk->transport->dgram_allow(remote_addr->svm_cid,
-					 remote_addr->svm_port)) {
+					 remote_addr->svm_port)) { // ???
 		err = -EINVAL;
 		goto out;
 	}
@@ -1212,7 +1265,7 @@ static int vsock_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 
 	return vsk->transport->dgram_dequeue(vsk, msg, len, flags);
 }
-
+// vsock协议操作集
 static const struct proto_ops vsock_dgram_ops = {
 	.family = PF_VSOCK,
 	.owner = THIS_MODULE,
@@ -1262,7 +1315,7 @@ static void vsock_connect_timeout(struct work_struct *work)
 
 	sock_put(sk);
 }
-
+// stream 连接
 static int vsock_stream_connect(struct socket *sock, struct sockaddr *addr,
 				int addr_len, int flags)
 {
@@ -1299,16 +1352,18 @@ static int vsock_stream_connect(struct socket *sock, struct sockaddr *addr,
 		break;
 	default:
 		if ((sk->sk_state == TCP_LISTEN) ||
-		    vsock_addr_cast(addr, addr_len, &remote_addr) != 0) {
+		    vsock_addr_cast(addr, addr_len, &remote_addr) != 0) { // 监听状态是server，报错
 			err = -EINVAL;
 			goto out;
 		}
 
-		/* Set the remote address that we are connecting to. */
+		/* Set the remote address that we are connecting to.
+		 * server地址拷贝
+		 * */
 		memcpy(&vsk->remote_addr, remote_addr,
 		       sizeof(vsk->remote_addr));
 
-		err = vsock_assign_transport(vsk, NULL);
+		err = vsock_assign_transport(vsk, NULL); // transport赋值
 		if (err)
 			goto out;
 
@@ -2001,7 +2056,7 @@ out:
 	release_sock(sk);
 	return err;
 }
-
+// strem协议操作集
 static const struct proto_ops vsock_stream_ops = {
 	.family = PF_VSOCK,
 	.owner = THIS_MODULE,
@@ -2067,13 +2122,13 @@ static int vsock_create(struct net *net, struct socket *sock,
 
 	return 0;
 }
-
+// vsock地址族
 static const struct net_proto_family vsock_family_ops = {
 	.family = AF_VSOCK,
 	.create = vsock_create,
 	.owner = THIS_MODULE,
 };
-
+// 支持的ioctl
 static long vsock_dev_do_ioctl(struct file *filp,
 			       unsigned int cmd, void __user *ptr)
 {
@@ -2101,7 +2156,7 @@ static long vsock_dev_do_ioctl(struct file *filp,
 
 	return retval;
 }
-
+// vsock设备ioctl
 static long vsock_dev_ioctl(struct file *filp,
 			    unsigned int cmd, unsigned long arg)
 {
@@ -2115,7 +2170,7 @@ static long vsock_dev_compat_ioctl(struct file *filp,
 	return vsock_dev_do_ioctl(filp, cmd, compat_ptr(arg));
 }
 #endif
-
+// vsock设备文件操作
 static const struct file_operations vsock_device_ops = {
 	.owner		= THIS_MODULE,
 	.unlocked_ioctl	= vsock_dev_ioctl,
@@ -2124,7 +2179,7 @@ static const struct file_operations vsock_device_ops = {
 #endif
 	.open		= nonseekable_open,
 };
-
+// vsock杂项设备
 static struct miscdevice vsock_device = {
 	.name		= "vsock",
 	.fops		= &vsock_device_ops,
@@ -2134,11 +2189,11 @@ static int __init vsock_init(void)
 {
 	int err = 0;
 
-	vsock_init_tables();
+	vsock_init_tables();						// 全局table初始化
 
 	vsock_proto.owner = THIS_MODULE;
 	vsock_device.minor = MISC_DYNAMIC_MINOR;
-	err = misc_register(&vsock_device);
+	err = misc_register(&vsock_device);			// misc设备注册
 	if (err) {
 		pr_err("Failed to register misc device\n");
 		goto err_reset_transport;
@@ -2150,7 +2205,7 @@ static int __init vsock_init(void)
 		goto err_deregister_misc;
 	}
 
-	err = sock_register(&vsock_family_ops);
+	err = sock_register(&vsock_family_ops);	// 协议族注册
 	if (err) {
 		pr_err("could not register af_vsock (%d) address family: %d\n",
 		       AF_VSOCK, err);
@@ -2166,12 +2221,12 @@ err_deregister_misc:
 err_reset_transport:
 	return err;
 }
-
+// 模块退出
 static void __exit vsock_exit(void)
 {
-	misc_deregister(&vsock_device);
-	sock_unregister(AF_VSOCK);
-	proto_unregister(&vsock_proto);
+	misc_deregister(&vsock_device);		// 设备解注册
+	sock_unregister(AF_VSOCK);			// vsock解注册
+	proto_unregister(&vsock_proto);		// vsock协议解注册
 }
 
 const struct vsock_transport *vsock_core_get_transport(struct vsock_sock *vsk)

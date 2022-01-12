@@ -894,7 +894,7 @@ static struct hv_driver hvs_drv = {
 	.suspend	= hvs_suspend,
 	.resume		= hvs_resume,
 };
-
+// hyperV init
 static int __init hvs_init(void)
 {
 	int ret;

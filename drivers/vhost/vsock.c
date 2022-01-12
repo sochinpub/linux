@@ -691,7 +691,7 @@ static void vhost_vsock_reset_orphans(struct sock *sk)
 	sk->sk_err = ECONNRESET;
 	sk->sk_error_report(sk);
 }
-
+//
 static int vhost_vsock_dev_release(struct inode *inode, struct file *file)
 {
 	struct vhost_vsock *vsock = file->private_data;
@@ -899,7 +899,7 @@ static struct miscdevice vhost_vsock_misc = {
 	.name = "vhost-vsock",
 	.fops = &vhost_vsock_fops,
 };
-
+// vhost vsock初始化
 static int __init vhost_vsock_init(void)
 {
 	int ret;

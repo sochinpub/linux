@@ -434,7 +434,7 @@ static void sock_disable_timestamp(struct sock *sk, unsigned long flags)
 	}
 }
 
-
+// 收包排队
 int __sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	unsigned long flags;
@@ -469,7 +469,7 @@ int __sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 EXPORT_SYMBOL(__sock_queue_rcv_skb);
-
+// 收包排队
 int sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int err;
@@ -3058,7 +3058,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	atomic_set(&sk->sk_drops, 0);
 }
 EXPORT_SYMBOL(sock_init_data);
-
+// sock可重入锁
 void lock_sock_nested(struct sock *sk, int subclass)
 {
 	might_sleep();

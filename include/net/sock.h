@@ -91,6 +91,7 @@ void SOCK_DEBUG(const struct sock *sk, const char *msg, ...)
 /* This is the per-socket lock.  The spinlock provides a synchronization
  * between user contexts and software interrupt processing, whereas the
  * mini-semaphore synchronizes multiple users amongst themselves.
+ * 每个socket的锁
  */
 typedef struct {
 	spinlock_t		slock;
@@ -158,6 +159,7 @@ typedef __u64 __bitwise __addrpair;
  *
  *	This is the minimal network layer representation of sockets, the header
  *	for struct sock and struct inet_timewait_sock.
+ *	网络层socket的common子集
  */
 struct sock_common {
 	/* skc_daddr and skc_rcv_saddr must be grouped on a 8 bytes aligned
@@ -249,6 +251,7 @@ struct sock_common {
 struct bpf_local_storage;
 
 /**
+ *  网络层socket对象
   *	struct sock - network layer representation of sockets
   *	@__sk_common: shared layout with inet_timewait_sock
   *	@sk_shutdown: mask of %SEND_SHUTDOWN and/or %RCV_SHUTDOWN
@@ -691,6 +694,7 @@ static inline bool __sk_del_node_init(struct sock *sk)
    when sk is ALREADY grabbed f.e. it is found in hash table
    or a list and the lookup is made under lock preventing hash table
    modifications.
+   socket加引用
  */
 
 static __always_inline void sock_hold(struct sock *sk)
@@ -1134,6 +1138,7 @@ static inline void sk_prot_clear_nulls(struct sock *sk, int size)
 
 /* Networking protocol blocks we attach to sockets.
  * socket layer -> transport layer interface
+ * 网络协议块：socket层的操作集合->传输层接口
  */
 struct proto {
 	void			(*close)(struct sock *sk,
@@ -1604,7 +1609,7 @@ static inline bool lockdep_sock_is_held(const struct sock *sk)
 }
 
 void lock_sock_nested(struct sock *sk, int subclass);
-
+// sock锁
 static inline void lock_sock(struct sock *sk)
 {
 	lock_sock_nested(sk, 0);

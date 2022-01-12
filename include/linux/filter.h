@@ -863,7 +863,7 @@ bpf_jit_binary_hdr(const struct bpf_prog *fp)
 }
 
 int sk_filter_trim_cap(struct sock *sk, struct sk_buff *skb, unsigned int cap);
-static inline int sk_filter(struct sock *sk, struct sk_buff *skb)
+static inline int sk_filter(struct sock *sk, struct sk_buff *skb) // 过滤
 {
 	return sk_filter_trim_cap(sk, skb, 1);
 }

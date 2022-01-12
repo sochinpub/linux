@@ -172,11 +172,13 @@ struct ucred {
 	__u32	gid;
 };
 
-/* Supported address families. */
+/* Supported address families.
+ * 支持的地址族
+ * */
 #define AF_UNSPEC	0
 #define AF_UNIX		1	/* Unix domain sockets 		*/
 #define AF_LOCAL	1	/* POSIX name for AF_UNIX	*/
-#define AF_INET		2	/* Internet IP Protocol 	*/
+#define AF_INET		2	/* Internet IP Protocol  IPV4支持	*/
 #define AF_AX25		3	/* Amateur Radio AX.25 		*/
 #define AF_IPX		4	/* Novell IPX 			*/
 #define AF_APPLETALK	5	/* AppleTalk DDP 		*/
@@ -184,7 +186,7 @@ struct ucred {
 #define AF_BRIDGE	7	/* Multiprotocol bridge 	*/
 #define AF_ATMPVC	8	/* ATM PVCs			*/
 #define AF_X25		9	/* Reserved for X.25 project 	*/
-#define AF_INET6	10	/* IP version 6			*/
+#define AF_INET6	10	/* IP version 6		IPV6支持	*/
 #define AF_ROSE		11	/* Amateur Radio X.25 PLP	*/
 #define AF_DECnet	12	/* Reserved for DECnet project	*/
 #define AF_NETBEUI	13	/* Reserved for 802.2LLC project*/
@@ -215,7 +217,7 @@ struct ucred {
 #define AF_CAIF		37	/* CAIF sockets			*/
 #define AF_ALG		38	/* Algorithm sockets		*/
 #define AF_NFC		39	/* NFC sockets			*/
-#define AF_VSOCK	40	/* vSockets			*/
+#define AF_VSOCK	40	/* vSockets			vsock支持*/
 #define AF_KCM		41	/* Kernel Connection Multiplexor*/
 #define AF_QIPCRTR	42	/* Qualcomm IPC Router          */
 #define AF_SMC		43	/* smc sockets: reserve number for
@@ -226,11 +228,13 @@ struct ucred {
 
 #define AF_MAX		45	/* For now.. */
 
-/* Protocol families, same as address families. */
+/* Protocol families, same as address families.
+ * 协议族，等同于地址族
+ * */
 #define PF_UNSPEC	AF_UNSPEC
 #define PF_UNIX		AF_UNIX
 #define PF_LOCAL	AF_LOCAL
-#define PF_INET		AF_INET
+#define PF_INET		AF_INET // IPV4协议族
 #define PF_AX25		AF_AX25
 #define PF_IPX		AF_IPX
 #define PF_APPLETALK	AF_APPLETALK
@@ -238,7 +242,7 @@ struct ucred {
 #define PF_BRIDGE	AF_BRIDGE
 #define PF_ATMPVC	AF_ATMPVC
 #define PF_X25		AF_X25
-#define PF_INET6	AF_INET6
+#define PF_INET6	AF_INET6 // IPV6协议族
 #define PF_ROSE		AF_ROSE
 #define PF_DECnet	AF_DECnet
 #define PF_NETBEUI	AF_NETBEUI
@@ -269,7 +273,7 @@ struct ucred {
 #define PF_CAIF		AF_CAIF
 #define PF_ALG		AF_ALG
 #define PF_NFC		AF_NFC
-#define PF_VSOCK	AF_VSOCK
+#define PF_VSOCK	AF_VSOCK // VSOCK协议族
 #define PF_KCM		AF_KCM
 #define PF_QIPCRTR	AF_QIPCRTR
 #define PF_SMC		AF_SMC
@@ -281,6 +285,7 @@ struct ucred {
 
 /* Flags we can use with send/ and recv.
    Added those for 1003.1g not all are supported yet
+ * send和recv使用的flags
  */
 
 #define MSG_OOB		1

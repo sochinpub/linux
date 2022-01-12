@@ -11,6 +11,7 @@
 #include <net/sock.h>
 #include <net/vsock_addr.h>
 
+// vsock地址族初始化
 void vsock_addr_init(struct sockaddr_vm *addr, u32 cid, u32 port)
 {
 	memset(addr, 0, sizeof(*addr));
@@ -20,6 +21,7 @@ void vsock_addr_init(struct sockaddr_vm *addr, u32 cid, u32 port)
 }
 EXPORT_SYMBOL_GPL(vsock_addr_init);
 
+// 校验vsock地址
 int vsock_addr_validate(const struct sockaddr_vm *addr)
 {
 	__u8 svm_valid_flags = VMADDR_FLAG_TO_HOST;
@@ -30,6 +32,7 @@ int vsock_addr_validate(const struct sockaddr_vm *addr)
 	if (addr->svm_family != AF_VSOCK)
 		return -EAFNOSUPPORT;
 
+	// 必须是到host上（VMADDR_FLAG_TO_HOST的flags）
 	if (addr->svm_flags & ~svm_valid_flags)
 		return -EINVAL;
 
@@ -37,18 +40,20 @@ int vsock_addr_validate(const struct sockaddr_vm *addr)
 }
 EXPORT_SYMBOL_GPL(vsock_addr_validate);
 
+// 端口绑定到特定端口
 bool vsock_addr_bound(const struct sockaddr_vm *addr)
 {
 	return addr->svm_port != VMADDR_PORT_ANY;
 }
 EXPORT_SYMBOL_GPL(vsock_addr_bound);
 
+// cid:port全绑定
 void vsock_addr_unbind(struct sockaddr_vm *addr)
 {
 	vsock_addr_init(addr, VMADDR_CID_ANY, VMADDR_PORT_ANY);
 }
 EXPORT_SYMBOL_GPL(vsock_addr_unbind);
-
+// 地址相同
 bool vsock_addr_equals_addr(const struct sockaddr_vm *addr,
 			    const struct sockaddr_vm *other)
 {
@@ -56,7 +61,7 @@ bool vsock_addr_equals_addr(const struct sockaddr_vm *addr,
 		addr->svm_port == other->svm_port;
 }
 EXPORT_SYMBOL_GPL(vsock_addr_equals_addr);
-
+// 地址转换
 int vsock_addr_cast(const struct sockaddr *addr,
 		    size_t len, struct sockaddr_vm **out_addr)
 {

@@ -260,7 +260,9 @@ struct ftrace_likely_data {
 #define asm_inline asm
 #endif
 
-/* Are two types/vars the same type (ignoring qualifiers)? */
+/* Are two types/vars the same type (ignoring qualifiers)?
+ * GCC编译器编译期判断类型是否一致
+ * */
 #define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
 
 /*
