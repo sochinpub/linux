@@ -159,6 +159,7 @@ enum zone_stat_item {
 	NR_FREE_CMA_PAGES,
 	NR_VM_ZONE_STAT_ITEMS };
 
+// 内存node状态
 enum node_stat_item {
 	NR_LRU_BASE,
 	NR_INACTIVE_ANON = NR_LRU_BASE, /* must match order of LRU_[IN]ACTIVE */
@@ -365,6 +366,7 @@ struct per_cpu_nodestat {
 
 #endif /* !__GENERATING_BOUNDS.H */
 
+// 定义zone的类型，这里__MAX_NR_ZONES是MAX_NR_ZONES的别名
 enum zone_type {
 	/*
 	 * ZONE_DMA and ZONE_DMA32 are used when there are peripherals not able
@@ -460,6 +462,7 @@ enum zone_type {
 
 #define ASYNC_AND_SYNC 2
 
+/* 内存zone的定义*/
 struct zone {
 	/* Read-mostly fields */
 
@@ -621,6 +624,7 @@ struct zone {
 	atomic_long_t		vm_stat[NR_VM_ZONE_STAT_ITEMS];
 	atomic_long_t		vm_numa_stat[NR_VM_NUMA_STAT_ITEMS];
 } ____cacheline_internodealigned_in_smp;
+// ____cacheline_internodealigned_in_smp 是用来做什么的 ???
 
 enum pgdat_flags {
 	PGDAT_DIRTY,			/* reclaim scanning has recently found
@@ -697,8 +701,12 @@ static inline bool zone_intersects(struct zone *zone,
 #define DEF_PRIORITY 12
 
 /* Maximum number of zones on a zonelist */
+/**
+ * 可以保存最大node数量下的所有zone
+ */
 #define MAX_ZONES_PER_ZONELIST (MAX_NUMNODES * MAX_NR_ZONES)
 
+//
 enum {
 	ZONELIST_FALLBACK,	/* zonelist with fallback */
 #ifdef CONFIG_NUMA
@@ -714,6 +722,7 @@ enum {
 /*
  * This struct contains information about a zone in a zonelist. It is stored
  * here to avoid dereferences into large structures and lookups of tables
+ * 指向zonelist中的某个zone的索引信息
  */
 struct zoneref {
 	struct zone *zone;	/* Pointer to actual zone */
@@ -721,6 +730,8 @@ struct zoneref {
 };
 
 /*
+ * 一次分配请求只在一个zonelist上执行，zonelist上的首个zone优先提供
+ * 内存分配，没有内存时，才回滚到该zonelist的其他zone上。
  * One allocation request operates on a zonelist. A zonelist
  * is a list of zones, the first one is the 'goal' of the
  * allocation, the other zones are fallback zones, in decreasing
@@ -729,6 +740,8 @@ struct zoneref {
  * To speed the reading of the zonelist, the zonerefs contain the zone index
  * of the entry being read. Helper functions to access information given
  * a struct zoneref are
+ * 为了加速zonelist的读取，zonerefs包含了zone的索引号，以下辅助函数提供访问该zoneref
+ *
  *
  * zonelist_zone()	- Return the struct zone * for an entry in _zonerefs
  * zonelist_zone_idx()	- Return the index of the zone for an entry
@@ -756,6 +769,8 @@ struct deferred_split {
  * it's memory layout. On UMA machines there is a single pglist_data which
  * describes the whole memory.
  *
+ * NUMA系统每个node有一个pglist_data实例，UMA系统只有一个该实例
+ *
  * Memory statistics and page replacement data structures are maintained on a
  * per-zone basis.
  */
@@ -771,6 +786,8 @@ typedef struct pglist_data {
 	 * node_zonelists contains references to all zones in all nodes.
 	 * Generally the first zones will be references to this node's
 	 * node_zones.
+	 * 引用了所有node 的zone。
+	 * 最大两个zonelist，zonelist按照优先级保存了内存分配的所有node的zone
 	 */
 	struct zonelist node_zonelists[MAX_ZONELISTS];
 
@@ -796,11 +813,15 @@ typedef struct pglist_data {
 	 */
 	spinlock_t node_size_lock;
 #endif
+	// 该node内存的起始物理页号地址
 	unsigned long node_start_pfn;
+	// 物理pages数目
 	unsigned long node_present_pages; /* total number of physical pages */
+	// 包含该node物理内存空洞的所有物理pages数目，什么是内存空洞 ???
 	unsigned long node_spanned_pages; /* total size of physical page
 					     range, including holes */
 	int node_id;
+	// 内存回收相关的结构体
 	wait_queue_head_t kswapd_wait;
 	wait_queue_head_t pfmemalloc_wait;
 	struct task_struct *kswapd;	/* Protected by
@@ -819,6 +840,7 @@ typedef struct pglist_data {
 	/*
 	 * This is a per-node reserve of pages that are not available
 	 * to userspace allocations.
+	 * 每个node有一个reserve页总数
 	 */
 	unsigned long		totalreserve_pages;
 

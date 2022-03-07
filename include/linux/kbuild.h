@@ -2,6 +2,7 @@
 #ifndef __LINUX_KBUILD_H
 #define __LINUX_KBUILD_H
 
+// 该宏定义 ???
 #define DEFINE(sym, val) \
 	asm volatile("\n.ascii \"->" #sym " %0 " #val "\"" : : "i" (val))
 

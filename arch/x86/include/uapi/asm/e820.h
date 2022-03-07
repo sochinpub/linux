@@ -5,6 +5,7 @@
 #define E820MAX	128		/* number of entries in E820MAP */
 
 /*
+ * 传统的e820 BIOS限制node数目为128
  * Legacy E820 BIOS limits us to 128 (E820MAX) nodes due to the
  * constrained space in the zeropage.  If we have more nodes than
  * that, and if we've booted off EFI firmware, then the EFI tables
