@@ -906,6 +906,7 @@ static int __init hvs_init(void)
 	if (ret != 0)
 		return ret;
 
+	// 注册hyperv transport
 	ret = vsock_core_register(&hvs_transport, VSOCK_TRANSPORT_F_G2H);
 	if (ret) {
 		vmbus_driver_unregister(&hvs_drv);

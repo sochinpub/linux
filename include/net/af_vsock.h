@@ -21,7 +21,9 @@ extern struct list_head vsock_bind_table[VSOCK_HASH_SIZE + 1];
 extern struct list_head vsock_connected_table[VSOCK_HASH_SIZE];
 extern spinlock_t vsock_table_lock;
 
+// vsock转socket
 #define vsock_sk(__sk)    ((struct vsock_sock *)__sk)
+// Socket转vsock
 #define sk_vsock(__vsk)   (&(__vsk)->sk)
 
 struct vsock_sock {
@@ -55,7 +57,7 @@ struct vsock_sock {
 	 * to clean up the socket.
 	 * 握手阶段的队列，头部都是监听socket
 	 */
-	struct list_head pending_links;		// 连接请求，未握手成功
+	struct list_head pending_links;		// 连接请求，未握手成功，挂链到listenr上
 	struct list_head accept_queue;		// 连接建立，握手层高
 	bool rejected;
 	struct delayed_work connect_work;

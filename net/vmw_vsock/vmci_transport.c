@@ -2092,6 +2092,7 @@ static int __init vmci_transport_init(void)
 
 	/* Register only with dgram feature, other features (H2G, G2H) will be
 	 * registered when the first host or guest becomes active.
+	 * 注册vmci的transport
 	 */
 	err = vsock_core_register(&vmci_transport, VSOCK_TRANSPORT_F_DGRAM);
 	if (err < 0)

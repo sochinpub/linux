@@ -904,6 +904,7 @@ static int __init vhost_vsock_init(void)
 {
 	int ret;
 
+	// 注册vsock的transport
 	ret = vsock_core_register(&vhost_transport.transport,
 				  VSOCK_TRANSPORT_F_H2G);
 	if (ret < 0)

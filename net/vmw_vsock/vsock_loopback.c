@@ -139,6 +139,7 @@ static int __init vsock_loopback_init(void)
 	INIT_LIST_HEAD(&vsock->pkt_list);
 	INIT_WORK(&vsock->pkt_work, vsock_loopback_work);
 
+	// 注册loopback的tarnsport
 	ret = vsock_core_register(&loopback_transport.transport,
 				  VSOCK_TRANSPORT_F_LOCAL);
 	if (ret)

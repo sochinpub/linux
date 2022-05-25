@@ -327,7 +327,11 @@ struct ucred {
 #endif
 
 
-/* Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx */
+/* Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx
+ *
+ * setsock的选项支持
+ *
+ * */
 #define SOL_IP		0
 /* #define SOL_ICMP	1	No-no-no! Due to Linux :-) we cannot use SOL_ICMP=1 */
 #define SOL_TCP		6

@@ -19,6 +19,7 @@ void vsock_addr_init(struct sockaddr_vm *addr, u32 cid, u32 port)
 	addr->svm_cid = cid;
 	addr->svm_port = port;
 }
+// 导出
 EXPORT_SYMBOL_GPL(vsock_addr_init);
 
 // 校验vsock地址

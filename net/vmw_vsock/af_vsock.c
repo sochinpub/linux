@@ -206,7 +206,7 @@ static DEFINE_MUTEX(vsock_register_mutex);
 /* XXX This can probably be implemented in a better way. */
 // hash函数，冲突概率较大
 #define VSOCK_CONN_HASH(src, dst)				\
-	(((src)->svm_cid ^ (dst)->svm_port) % VSOCK_HASH_SIZE)
+	(((src)->svm_cid ^ (dst)->svm_port) % VSOCK_HASH_SIZE)		// 如果发生冲突如何解决，list_head拉链
 // 根据src的cid和dst的port，查找连接socket
 #define vsock_connected_sockets(src, dst)		\
 	(&vsock_connected_table[VSOCK_CONN_HASH(src, dst)])
@@ -240,7 +240,7 @@ static void vsock_init_tables(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(vsock_bind_table); i++)
-		INIT_LIST_HEAD(&vsock_bind_table[i]);
+		INIT_LIST_HEAD(&vsock_bind_table[i]);			// 初始化链表
 
 	for (i = 0; i < ARRAY_SIZE(vsock_connected_table); i++)
 		INIT_LIST_HEAD(&vsock_connected_table[i]);
@@ -249,8 +249,8 @@ static void vsock_init_tables(void)
 static void __vsock_insert_bound(struct list_head *list,
 				 struct vsock_sock *vsk)
 {
-	sock_hold(&vsk->sk);
-	list_add(&vsk->bound_table, list);
+	sock_hold(&vsk->sk);				// sock加引用
+	list_add(&vsk->bound_table, list);  //
 }
 // 插入到连接的table中
 static void __vsock_insert_connected(struct list_head *list,
@@ -413,7 +413,7 @@ EXPORT_SYMBOL_GPL(vsock_add_pending);
 void vsock_remove_pending(struct sock *listener, struct sock *pending)
 {
 	struct vsock_sock *vpending = vsock_sk(pending);
-
+	// 从listenr上移除
 	list_del_init(&vpending->pending_links);
 	sock_put(listener);
 	sock_put(pending);
@@ -475,6 +475,7 @@ static void vsock_deassign_transport(struct vsock_sock *vsk)
  *  - remote CID > VMADDR_CID_HOST will use host->guest transport;
  *  ???
  */
+// 分配实际的transport，并初始化transport
 int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 {
 	const struct vsock_transport *new_transport;
@@ -737,7 +738,7 @@ static int __vsock_bind(struct sock *sk, struct sockaddr_vm *addr)
 
 	switch (sk->sk_socket->type) {
 	case SOCK_STREAM:
-		spin_lock_bh(&vsock_table_lock);			// 锁
+		spin_lock_bh(&vsock_table_lock);			// 大锁锁表
 		retval = __vsock_bind_stream(vsk, addr);
 		spin_unlock_bh(&vsock_table_lock);
 		break;
@@ -756,6 +757,7 @@ static int __vsock_bind(struct sock *sk, struct sockaddr_vm *addr)
 
 static void vsock_connect_timeout(struct work_struct *work);
 
+// 创建vsock Socket
 static struct sock *__vsock_create(struct net *net,
 				   struct socket *sock,
 				   struct sock *parent,
@@ -767,10 +769,11 @@ static struct sock *__vsock_create(struct net *net,
 	struct vsock_sock *psk;
 	struct vsock_sock *vsk;
 
+	// 1) 分配sock
 	sk = sk_alloc(net, AF_VSOCK, priority, &vsock_proto, kern);
 	if (!sk)
 		return NULL;
-
+	// 2）初始化
 	sock_init_data(sock, sk);
 
 	/* sk->sk_type is normally set in sock_init_data, but only if sock is
@@ -800,6 +803,7 @@ static struct sock *__vsock_create(struct net *net,
 	INIT_DELAYED_WORK(&vsk->connect_work, vsock_connect_timeout);
 	INIT_DELAYED_WORK(&vsk->pending_work, vsock_pending_work);
 
+	// 什么是parent ??????
 	psk = parent ? vsock_sk(parent) : NULL;
 	if (parent) {
 		vsk->trusted = psk->trusted;
@@ -912,6 +916,7 @@ static int vsock_release(struct socket *sock)
 	return 0;
 }
 
+// bind
 static int
 vsock_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 {
@@ -1383,6 +1388,7 @@ static int vsock_stream_connect(struct socket *sock, struct sockaddr *addr,
 		if (err)
 			goto out;
 
+		// 已经发起连接
 		sk->sk_state = TCP_SYN_SENT;
 
 		err = transport->connect(vsk);
@@ -2078,6 +2084,7 @@ static const struct proto_ops vsock_stream_ops = {
 	.sendpage = sock_no_sendpage,
 };
 
+// 创建一个vsock socket
 static int vsock_create(struct net *net, struct socket *sock,
 			int protocol, int kern)
 {
@@ -2104,6 +2111,7 @@ static int vsock_create(struct net *net, struct socket *sock,
 
 	sock->state = SS_UNCONNECTED;
 
+	// 创建
 	sk = __vsock_create(net, sock, NULL, GFP_KERNEL, 0, kern);
 	if (!sk)
 		return -ENOMEM;
@@ -2118,6 +2126,7 @@ static int vsock_create(struct net *net, struct socket *sock,
 		}
 	}
 
+	// 手册创建插入到unbound
 	vsock_insert_unbound(vsk);
 
 	return 0;
@@ -2185,26 +2194,29 @@ static struct miscdevice vsock_device = {
 	.fops		= &vsock_device_ops,
 };
 
+// vsock模块加载
 static int __init vsock_init(void)
 {
 	int err = 0;
 
+	// 初始化vsock静态表
 	vsock_init_tables();						// 全局table初始化
 
 	vsock_proto.owner = THIS_MODULE;
 	vsock_device.minor = MISC_DYNAMIC_MINOR;
+	// 1）注册杂项设备
 	err = misc_register(&vsock_device);			// misc设备注册
 	if (err) {
 		pr_err("Failed to register misc device\n");
 		goto err_reset_transport;
 	}
-
+	// 2）注册sock协议族
 	err = proto_register(&vsock_proto, 1);	/* we want our slab */
 	if (err) {
 		pr_err("Cannot register vsock protocol\n");
 		goto err_deregister_misc;
 	}
-
+	// 3)网络协议族注册
 	err = sock_register(&vsock_family_ops);	// 协议族注册
 	if (err) {
 		pr_err("could not register af_vsock (%d) address family: %d\n",
@@ -2235,6 +2247,8 @@ const struct vsock_transport *vsock_core_get_transport(struct vsock_sock *vsk)
 }
 EXPORT_SYMBOL_GPL(vsock_core_get_transport);
 
+// 注册vsock transport
+// 根据features注册h2g/g2h/dgram/local的vsock transport
 int vsock_core_register(const struct vsock_transport *t, int features)
 {
 	const struct vsock_transport *t_h2g, *t_g2h, *t_dgram, *t_local;
@@ -2291,6 +2305,7 @@ err_busy:
 }
 EXPORT_SYMBOL_GPL(vsock_core_register);
 
+// 解注册
 void vsock_core_unregister(const struct vsock_transport *t)
 {
 	mutex_lock(&vsock_register_mutex);

@@ -37,7 +37,7 @@ struct af_vsockmon_hdr {
 	__le32 src_port;
 	__le32 dst_port;
 	__le16 op;			/* enum af_vsockmon_op */
-	__le16 transport;		/* enum af_vsockmon_transport */
+	__le16 transport;	/* enum af_vsockmon_transport */
 	__le16 len;			/* Transport header length */
 	__u8 reserved[2];
 };

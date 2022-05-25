@@ -715,6 +715,7 @@ static int __init virtio_vsock_init(void)
 	if (!virtio_vsock_workqueue)
 		return -ENOMEM;
 
+	// 注册virtio transport
 	ret = vsock_core_register(&virtio_transport.transport,
 				  VSOCK_TRANSPORT_F_G2H);
 	if (ret)

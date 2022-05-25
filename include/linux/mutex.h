@@ -37,6 +37,7 @@ struct ww_acquire_ctx;
  * - held mutexes must not be reinitialized
  * - mutexes may not be used in hardware or software interrupt
  *   contexts such as tasklets and timers
+ *   mutex不能再硬件或软件的中断上下文中使用：tasklet, timers
  *
  * These semantics are fully enforced when DEBUG_MUTEXES is
  * enabled. Furthermore, besides enforcing the above rules, the mutex
@@ -55,9 +56,9 @@ struct mutex {
 	atomic_long_t		owner;
 	spinlock_t		wait_lock;
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
-	struct optimistic_spin_queue osq; /* Spinner MCS lock */
+	struct optimistic_spin_queue osq; /* Spinner MCS lock   */
 #endif
-	struct list_head	wait_list;
+	struct list_head	wait_list;			// 排队等锁的task
 #ifdef CONFIG_DEBUG_MUTEXES
 	void			*magic;
 #endif
