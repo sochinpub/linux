@@ -38,6 +38,10 @@
 #include <linux/virtio_ids.h>
 #include <linux/virtio_config.h>
 
+/**
+ * 用户侧header
+ */
+
 struct virtio_vsock_config {
 	__le64 guest_cid;
 } __attribute__((packed));
@@ -50,7 +54,7 @@ struct virtio_vsock_event {
 	__le32 id;
 } __attribute__((packed));
 
-struct virtio_vsock_hdr {
+struct virtio_vsock_hdr { // 44B
 	__le64	src_cid;
 	__le64	dst_cid;
 	__le32	src_port;
@@ -71,7 +75,7 @@ enum virtio_vsock_op {
 	VIRTIO_VSOCK_OP_INVALID = 0,
 
 	/* Connect operations */
-	VIRTIO_VSOCK_OP_REQUEST = 1,
+	VIRTIO_VSOCK_OP_REQUEST = 1,		// client连接请求
 	VIRTIO_VSOCK_OP_RESPONSE = 2,
 	VIRTIO_VSOCK_OP_RST = 3,
 	VIRTIO_VSOCK_OP_SHUTDOWN = 4,
@@ -87,8 +91,8 @@ enum virtio_vsock_op {
 
 /* VIRTIO_VSOCK_OP_SHUTDOWN flags values */
 enum virtio_vsock_shutdown {
-	VIRTIO_VSOCK_SHUTDOWN_RCV = 1,
-	VIRTIO_VSOCK_SHUTDOWN_SEND = 2,
+	VIRTIO_VSOCK_SHUTDOWN_RCV = 1,		// 关闭接收
+	VIRTIO_VSOCK_SHUTDOWN_SEND = 2,		// 关闭发送
 };
 
 #endif /* _UAPI_LINUX_VIRTIO_VSOCK_H */

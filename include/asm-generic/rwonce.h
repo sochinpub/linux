@@ -31,6 +31,7 @@
  * actually be atomic in some cases (namely Armv7 + LPAE), but for others we
  * rely on the access being split into 2x32-bit accesses for a 32-bit quantity
  * (e.g. a virtual address) and a strong prevailing wind.
+ * 允许在32位架构下64位访问操作
  */
 #define compiletime_assert_rwonce_type(t)					\
 	compiletime_assert(__native_word(t) || sizeof(t) == sizeof(long long),	\

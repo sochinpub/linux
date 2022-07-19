@@ -22,14 +22,17 @@
 #include <net/af_vsock.h>
 
 static struct workqueue_struct *virtio_vsock_workqueue;
+// 一个Guest只能支持一个virtio vsock
 static struct virtio_vsock __rcu *the_virtio_vsock;
 static DEFINE_MUTEX(the_virtio_vsock_mutex); /* protects the_virtio_vsock */
 
-struct virtio_vsock {
-	struct virtio_device *vdev;
-	struct virtqueue *vqs[VSOCK_VQ_MAX];
+struct virtio_vsock { // 结构体
+	struct virtio_device *vdev;						// virtio设备
+	struct virtqueue *vqs[VSOCK_VQ_MAX];			// 队列
 
-	/* Virtqueue processing is deferred to a workqueue */
+	/* Virtqueue processing is deferred to a workqueue
+	 * virtqueue的处理被defer到一个workqueue中
+	 * */
 	struct work_struct tx_work;
 	struct work_struct rx_work;
 	struct work_struct event_work;
@@ -40,11 +43,11 @@ struct virtio_vsock {
 	struct mutex tx_lock;
 	bool tx_run;
 
-	struct work_struct send_pkt_work;
+	struct work_struct send_pkt_work;		// 这是什么 ???
 	spinlock_t send_pkt_list_lock;
 	struct list_head send_pkt_list;
 
-	atomic_t queued_replies;
+	atomic_t queued_replies;				// 对回复的排队
 
 	/* The following fields are protected by rx_lock.  vqs[VSOCK_VQ_RX]
 	 * must be accessed with rx_lock held.
@@ -59,12 +62,12 @@ struct virtio_vsock {
 	 */
 	struct mutex event_lock;
 	bool event_run;
-	struct virtio_vsock_event event_list[8];
+	struct virtio_vsock_event event_list[8];	// 支持8个
 
 	u32 guest_cid;
 };
 
-static u32 virtio_transport_get_local_cid(void)
+static u32 virtio_transport_get_local_cid(void) // 获取Guest本地的CID
 {
 	struct virtio_vsock *vsock;
 	u32 ret;
@@ -83,7 +86,7 @@ out_rcu:
 }
 
 static void
-virtio_transport_send_pkt_work(struct work_struct *work)
+virtio_transport_send_pkt_work(struct work_struct *work) // 执行包发送
 {
 	struct virtio_vsock *vsock =
 		container_of(work, struct virtio_vsock, send_pkt_work);
@@ -96,7 +99,7 @@ virtio_transport_send_pkt_work(struct work_struct *work)
 	if (!vsock->tx_run)
 		goto out;
 
-	vq = vsock->vqs[VSOCK_VQ_TX];
+	vq = vsock->vqs[VSOCK_VQ_TX];		// 发送VQ
 
 	for (;;) {
 		struct virtio_vsock_pkt *pkt;
@@ -104,13 +107,13 @@ virtio_transport_send_pkt_work(struct work_struct *work)
 		int ret, in_sg = 0, out_sg = 0;
 		bool reply;
 
-		spin_lock_bh(&vsock->send_pkt_list_lock);
+		spin_lock_bh(&vsock->send_pkt_list_lock);		// lock bh
 		if (list_empty(&vsock->send_pkt_list)) {
 			spin_unlock_bh(&vsock->send_pkt_list_lock);
 			break;
 		}
 
-		pkt = list_first_entry(&vsock->send_pkt_list,
+		pkt = list_first_entry(&vsock->send_pkt_list,	// 链头
 				       struct virtio_vsock_pkt, list);
 		list_del_init(&pkt->list);
 		spin_unlock_bh(&vsock->send_pkt_list_lock);
@@ -119,18 +122,20 @@ virtio_transport_send_pkt_work(struct work_struct *work)
 
 		reply = pkt->reply;
 
+		// 头部sge
 		sg_init_one(&hdr, &pkt->hdr, sizeof(pkt->hdr));
 		sgs[out_sg++] = &hdr;
-		if (pkt->buf) {
+		if (pkt->buf) { // 如果有数据，数据sge
 			sg_init_one(&buf, pkt->buf, pkt->len);
 			sgs[out_sg++] = &buf;
 		}
 
+		// 添加到vq中
 		ret = virtqueue_add_sgs(vq, sgs, out_sg, in_sg, pkt, GFP_KERNEL);
 		/* Usually this means that there is no more space available in
 		 * the vq
 		 */
-		if (ret < 0) {
+		if (ret < 0) { // 失败，重新挂链，等待下次发送
 			spin_lock_bh(&vsock->send_pkt_list_lock);
 			list_add(&pkt->list, &vsock->send_pkt_list);
 			spin_unlock_bh(&vsock->send_pkt_list_lock);
@@ -144,7 +149,7 @@ virtio_transport_send_pkt_work(struct work_struct *work)
 			val = atomic_dec_return(&vsock->queued_replies);
 
 			/* Do we now have resources to resume rx processing? */
-			if (val + 1 == virtqueue_get_vring_size(rx_vq))
+			if (val + 1 == virtqueue_get_vring_size(rx_vq)) // 回复已经填满了vq
 				restart_rx = true;
 		}
 
@@ -152,17 +157,17 @@ virtio_transport_send_pkt_work(struct work_struct *work)
 	}
 
 	if (added)
-		virtqueue_kick(vq);
+		virtqueue_kick(vq);  // kick KVM
 
 out:
 	mutex_unlock(&vsock->tx_lock);
 
-	if (restart_rx)
+	if (restart_rx)	// 接收工作排队到wq中
 		queue_work(virtio_vsock_workqueue, &vsock->rx_work);
 }
 
 static int
-virtio_transport_send_pkt(struct virtio_vsock_pkt *pkt)
+virtio_transport_send_pkt(struct virtio_vsock_pkt *pkt) // Guest发送包
 {
 	struct virtio_vsock *vsock;
 	int len = pkt->len;
@@ -175,20 +180,20 @@ virtio_transport_send_pkt(struct virtio_vsock_pkt *pkt)
 		goto out_rcu;
 	}
 
-	if (le64_to_cpu(pkt->hdr.dst_cid) == vsock->guest_cid) {
+	if (le64_to_cpu(pkt->hdr.dst_cid) == vsock->guest_cid) { // 发送给自己 ???
 		virtio_transport_free_pkt(pkt);
 		len = -ENODEV;
 		goto out_rcu;
 	}
 
-	if (pkt->reply)
+	if (pkt->reply)	// 当前是回复包 ??????
 		atomic_inc(&vsock->queued_replies);
 
 	spin_lock_bh(&vsock->send_pkt_list_lock);
-	list_add_tail(&pkt->list, &vsock->send_pkt_list);
+	list_add_tail(&pkt->list, &vsock->send_pkt_list);	// 只挂队列
 	spin_unlock_bh(&vsock->send_pkt_list_lock);
 
-	queue_work(virtio_vsock_workqueue, &vsock->send_pkt_work);
+	queue_work(virtio_vsock_workqueue, &vsock->send_pkt_work);	// 发起一个work给CPU
 
 out_rcu:
 	rcu_read_unlock();
@@ -196,7 +201,7 @@ out_rcu:
 }
 
 static int
-virtio_transport_cancel_pkt(struct vsock_sock *vsk)
+virtio_transport_cancel_pkt(struct vsock_sock *vsk) // 取消pkt
 {
 	struct virtio_vsock *vsock;
 	struct virtio_vsock_pkt *pkt, *n;
@@ -211,10 +216,10 @@ virtio_transport_cancel_pkt(struct vsock_sock *vsk)
 	}
 
 	spin_lock_bh(&vsock->send_pkt_list_lock);
-	list_for_each_entry_safe(pkt, n, &vsock->send_pkt_list, list) {
+	list_for_each_entry_safe(pkt, n, &vsock->send_pkt_list, list) { // 遍历待发送队列
 		if (pkt->vsk != vsk)
 			continue;
-		list_move(&pkt->list, &freeme);
+		list_move(&pkt->list, &freeme);	// 移动到带释放队列，这里为什么会有多个vsk ??????
 	}
 	spin_unlock_bh(&vsock->send_pkt_list_lock);
 
@@ -250,13 +255,15 @@ static void virtio_vsock_rx_fill(struct virtio_vsock *vsock)
 	struct virtqueue *vq;
 	int ret;
 
-	vq = vsock->vqs[VSOCK_VQ_RX];
+	vq = vsock->vqs[VSOCK_VQ_RX];	// h2g的传输
 
+	// 填充h2g队列：Guest侧自己的接收包
 	do {
 		pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
 		if (!pkt)
 			break;
 
+		// 内置的一段transport缓冲区
 		pkt->buf = kmalloc(buf_len, GFP_KERNEL);
 		if (!pkt->buf) {
 			virtio_transport_free_pkt(pkt);
@@ -266,11 +273,13 @@ static void virtio_vsock_rx_fill(struct virtio_vsock *vsock)
 		pkt->buf_len = buf_len;
 		pkt->len = buf_len;
 
+		// 头部作为1个sge
 		sg_init_one(&hdr, &pkt->hdr, sizeof(pkt->hdr));
 		sgs[0] = &hdr;
-
+		// 内置缓冲区作为第2个sge
 		sg_init_one(&buf, pkt->buf, buf_len);
 		sgs[1] = &buf;
+		// 填充到VQ中
 		ret = virtqueue_add_sgs(vq, sgs, 0, 2, pkt, GFP_KERNEL);
 		if (ret) {
 			virtio_transport_free_pkt(pkt);
@@ -283,14 +292,14 @@ static void virtio_vsock_rx_fill(struct virtio_vsock *vsock)
 	virtqueue_kick(vq);
 }
 
-static void virtio_transport_tx_work(struct work_struct *work)
+static void virtio_transport_tx_work(struct work_struct *work) // 执行发送工作
 {
 	struct virtio_vsock *vsock =
 		container_of(work, struct virtio_vsock, tx_work);
 	struct virtqueue *vq;
 	bool added = false;
 
-	vq = vsock->vqs[VSOCK_VQ_TX];
+	vq = vsock->vqs[VSOCK_VQ_TX];	// 发送VQ
 	mutex_lock(&vsock->tx_lock);
 
 	if (!vsock->tx_run)
@@ -301,7 +310,7 @@ static void virtio_transport_tx_work(struct work_struct *work)
 		unsigned int len;
 
 		virtqueue_disable_cb(vq);
-		while ((pkt = virtqueue_get_buf(vq, &len)) != NULL) {
+		while ((pkt = virtqueue_get_buf(vq, &len)) != NULL) { // 遍历VQ，释放
 			virtio_transport_free_pkt(pkt);
 			added = true;
 		}
@@ -334,7 +343,7 @@ static int virtio_vsock_event_fill_one(struct virtio_vsock *vsock,
 	struct virtqueue *vq;
 
 	vq = vsock->vqs[VSOCK_VQ_EVENT];
-
+	// 填充1个sge
 	sg_init_one(&sg, event, sizeof(*event));
 
 	return virtqueue_add_inbuf(vq, &sg, 1, event, GFP_KERNEL);
@@ -346,6 +355,7 @@ static void virtio_vsock_event_fill(struct virtio_vsock *vsock)
 	size_t i;
 
 	for (i = 0; i < ARRAY_SIZE(vsock->event_list); i++) {
+		// 结构体中的地址，作为sge
 		struct virtio_vsock_event *event = &vsock->event_list[i];
 
 		virtio_vsock_event_fill_one(vsock, event);
@@ -354,7 +364,7 @@ static void virtio_vsock_event_fill(struct virtio_vsock *vsock)
 	virtqueue_kick(vsock->vqs[VSOCK_VQ_EVENT]);
 }
 
-static void virtio_vsock_reset_sock(struct sock *sk)
+static void virtio_vsock_reset_sock(struct sock *sk) // 重置连接的virtio vsock socket
 {
 	lock_sock(sk);
 	sk->sk_state = TCP_CLOSE;
@@ -363,6 +373,7 @@ static void virtio_vsock_reset_sock(struct sock *sk)
 	release_sock(sk);
 }
 
+// 通过配置空间 查 guest cid
 static void virtio_vsock_update_guest_cid(struct virtio_vsock *vsock)
 {
 	struct virtio_device *vdev = vsock->vdev;
@@ -375,7 +386,7 @@ static void virtio_vsock_update_guest_cid(struct virtio_vsock *vsock)
 
 /* event_lock must be held */
 static void virtio_vsock_event_handle(struct virtio_vsock *vsock,
-				      struct virtio_vsock_event *event)
+				      struct virtio_vsock_event *event)	// 处理事件
 {
 	switch (le32_to_cpu(event->id)) {
 	case VIRTIO_VSOCK_EVENT_TRANSPORT_RESET:
@@ -385,7 +396,7 @@ static void virtio_vsock_event_handle(struct virtio_vsock *vsock,
 	}
 }
 
-static void virtio_transport_event_work(struct work_struct *work)
+static void virtio_transport_event_work(struct work_struct *work) // G2h的event
 {
 	struct virtio_vsock *vsock =
 		container_of(work, struct virtio_vsock, event_work);
@@ -443,7 +454,7 @@ static void virtio_vsock_rx_done(struct virtqueue *vq)
 	queue_work(virtio_vsock_workqueue, &vsock->rx_work);
 }
 
-static struct virtio_transport virtio_transport = {
+static struct virtio_transport virtio_transport = { // 当前实现的vsock transport
 	.transport = {
 		.module                   = THIS_MODULE,
 
@@ -557,7 +568,9 @@ static int virtio_vsock_probe(struct virtio_device *vdev)
 	if (ret)
 		return ret;
 
-	/* Only one virtio-vsock device per guest is supported */
+	/* Only one virtio-vsock device per guest is supported
+	 * 一个Guest只允许1个virtio-vsock设备
+	 * */
 	if (rcu_dereference_protected(the_virtio_vsock,
 				lockdep_is_held(&the_virtio_vsock_mutex))) {
 		ret = -EBUSY;
@@ -651,6 +664,7 @@ static void virtio_vsock_remove(struct virtio_device *vdev)
 
 	/* Flush all device writes and interrupts, device will not use any
 	 * more buffers.
+	 * 刷新设备的写和中断
 	 */
 	vdev->config->reset(vdev);
 
@@ -702,7 +716,7 @@ static struct virtio_driver virtio_vsock_driver = {
 	.feature_table_size = ARRAY_SIZE(features),
 	.driver.name = KBUILD_MODNAME,
 	.driver.owner = THIS_MODULE,
-	.id_table = id_table,
+	.id_table = id_table,				// 匹配ID，来找driver驱动
 	.probe = virtio_vsock_probe,
 	.remove = virtio_vsock_remove,
 };
@@ -711,16 +725,18 @@ static int __init virtio_vsock_init(void)
 {
 	int ret;
 
+	// 分配一个workqueue
 	virtio_vsock_workqueue = alloc_workqueue("virtio_vsock", 0, 0);
 	if (!virtio_vsock_workqueue)
 		return -ENOMEM;
 
 	// 注册virtio transport
 	ret = vsock_core_register(&virtio_transport.transport,
-				  VSOCK_TRANSPORT_F_G2H);
+				  VSOCK_TRANSPORT_F_G2H);					// 注册一个Guest2Host的transport
 	if (ret)
 		goto out_wq;
 
+	// 注册 virtio vsock driver
 	ret = register_virtio_driver(&virtio_vsock_driver);
 	if (ret)
 		goto out_vci;

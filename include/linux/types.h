@@ -164,6 +164,7 @@ typedef phys_addr_t resource_size_t;
 typedef unsigned long irq_hw_number_t;
 
 // Linux内核整数原子操作
+// 支持整数的原子操作
 typedef struct {
 	int counter;
 } atomic_t;

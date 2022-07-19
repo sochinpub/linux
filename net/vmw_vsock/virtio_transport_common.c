@@ -52,7 +52,7 @@ virtio_transport_alloc_pkt(struct virtio_vsock_pkt_info *info,
 	if (!pkt)
 		return NULL;
 
-	pkt->hdr.type		= cpu_to_le16(info->type);
+	pkt->hdr.type		= cpu_to_le16(info->type);	// 填充pkt
 	pkt->hdr.op		= cpu_to_le16(info->op);
 	pkt->hdr.src_cid	= cpu_to_le64(src_cid);
 	pkt->hdr.dst_cid	= cpu_to_le64(dst_cid);
@@ -92,7 +92,9 @@ out_pkt:
 	return NULL;
 }
 
-/* Packet capture */
+/* Packet capture
+ * 包捕获
+ * */
 static struct sk_buff *virtio_transport_build_skb(void *opaque)
 {
 	struct virtio_vsock_pkt *pkt = opaque;
@@ -179,6 +181,7 @@ static int virtio_transport_send_pkt_info(struct vsock_sock *vsk,
 	struct virtio_vsock_pkt *pkt;
 	u32 pkt_len = info->pkt_len;
 
+	// 1) 拿transport
 	t_ops = virtio_transport_get_ops(vsk);
 	if (unlikely(!t_ops))
 		return -EFAULT;
@@ -220,7 +223,7 @@ static int virtio_transport_send_pkt_info(struct vsock_sock *vsk,
 }
 
 static bool virtio_transport_inc_rx_pkt(struct virtio_vsock_sock *vvs,
-					struct virtio_vsock_pkt *pkt)
+					struct virtio_vsock_pkt *pkt) // 接收包
 {
 	if (vvs->rx_bytes + pkt->len > vvs->buf_alloc)
 		return false;
@@ -230,13 +233,13 @@ static bool virtio_transport_inc_rx_pkt(struct virtio_vsock_sock *vvs,
 }
 
 static void virtio_transport_dec_rx_pkt(struct virtio_vsock_sock *vvs,
-					struct virtio_vsock_pkt *pkt)
+					struct virtio_vsock_pkt *pkt) //
 {
 	vvs->rx_bytes -= pkt->len;
 	vvs->fwd_cnt += pkt->len;
 }
 
-void virtio_transport_inc_tx_pkt(struct virtio_vsock_sock *vvs, struct virtio_vsock_pkt *pkt)
+void virtio_transport_inc_tx_pkt(struct virtio_vsock_sock *vvs, struct virtio_vsock_pkt *pkt) //
 {
 	spin_lock_bh(&vvs->rx_lock);
 	vvs->last_fwd_cnt = vvs->fwd_cnt;
@@ -251,7 +254,7 @@ u32 virtio_transport_get_credit(struct virtio_vsock_sock *vvs, u32 credit)
 	u32 ret;
 
 	spin_lock_bh(&vvs->tx_lock);
-	ret = vvs->peer_buf_alloc - (vvs->tx_cnt - vvs->peer_fwd_cnt);
+	ret = vvs->peer_buf_alloc - (vvs->tx_cnt - vvs->peer_fwd_cnt); // 计算可发送的数目：对端的缓冲区数量减去
 	if (ret > credit)
 		ret = credit;
 	vvs->tx_cnt += ret;
@@ -261,7 +264,7 @@ u32 virtio_transport_get_credit(struct virtio_vsock_sock *vvs, u32 credit)
 }
 EXPORT_SYMBOL_GPL(virtio_transport_get_credit);
 
-void virtio_transport_put_credit(struct virtio_vsock_sock *vvs, u32 credit)
+void virtio_transport_put_credit(struct virtio_vsock_sock *vvs, u32 credit) // 减credit
 {
 	spin_lock_bh(&vvs->tx_lock);
 	vvs->tx_cnt -= credit;
@@ -271,7 +274,7 @@ EXPORT_SYMBOL_GPL(virtio_transport_put_credit);
 
 static int virtio_transport_send_credit_update(struct vsock_sock *vsk,
 					       int type,
-					       struct virtio_vsock_hdr *hdr)
+					       struct virtio_vsock_hdr *hdr) // 发送更新credit消息给对端
 {
 	struct virtio_vsock_pkt_info info = {
 		.op = VIRTIO_VSOCK_OP_CREDIT_UPDATE,
@@ -279,13 +282,13 @@ static int virtio_transport_send_credit_update(struct vsock_sock *vsk,
 		.vsk = vsk,
 	};
 
-	return virtio_transport_send_pkt_info(vsk, &info);
+	return virtio_transport_send_pkt_info(vsk, &info);	// 发送该类型的pkt
 }
 
 static ssize_t
 virtio_transport_stream_do_peek(struct vsock_sock *vsk,
 				struct msghdr *msg,
-				size_t len)
+				size_t len)						// 取头部消息
 {
 	struct virtio_vsock_sock *vvs = vsk->trans;
 	struct virtio_vsock_pkt *pkt;
@@ -294,7 +297,7 @@ virtio_transport_stream_do_peek(struct vsock_sock *vsk,
 
 	spin_lock_bh(&vvs->rx_lock);
 
-	list_for_each_entry(pkt, &vvs->rx_queue, list) {
+	list_for_each_entry(pkt, &vvs->rx_queue, list) { // Socket接收队列变量
 		off = pkt->off;
 
 		if (total == len)
@@ -310,7 +313,7 @@ virtio_transport_stream_do_peek(struct vsock_sock *vsk,
 			 */
 			spin_unlock_bh(&vvs->rx_lock);
 
-			err = memcpy_to_msg(msg, pkt->buf + off, bytes);
+			err = memcpy_to_msg(msg, pkt->buf + off, bytes); // may sleep, 拷贝到msg
 			if (err)
 				goto out;
 
@@ -334,7 +337,7 @@ out:
 static ssize_t
 virtio_transport_stream_do_dequeue(struct vsock_sock *vsk,
 				   struct msghdr *msg,
-				   size_t len)
+				   size_t len) // 出队
 {
 	struct virtio_vsock_sock *vvs = vsk->trans;
 	struct virtio_vsock_pkt *pkt;
@@ -412,7 +415,7 @@ EXPORT_SYMBOL_GPL(virtio_transport_stream_dequeue);
 int
 virtio_transport_dgram_dequeue(struct vsock_sock *vsk,
 			       struct msghdr *msg,
-			       size_t len, int flags)
+			       size_t len, int flags) // 目前不支持udp
 {
 	return -EOPNOTSUPP;
 }
@@ -436,14 +439,14 @@ static s64 virtio_transport_has_space(struct vsock_sock *vsk)
 	struct virtio_vsock_sock *vvs = vsk->trans;
 	s64 bytes;
 
-	bytes = vvs->peer_buf_alloc - (vvs->tx_cnt - vvs->peer_fwd_cnt);
+	bytes = vvs->peer_buf_alloc - (vvs->tx_cnt - vvs->peer_fwd_cnt); //
 	if (bytes < 0)
 		bytes = 0;
 
 	return bytes;
 }
 
-s64 virtio_transport_stream_has_space(struct vsock_sock *vsk)
+s64 virtio_transport_stream_has_space(struct vsock_sock *vsk) // 判断是否有空间
 {
 	struct virtio_vsock_sock *vvs = vsk->trans;
 	s64 bytes;
@@ -487,7 +490,7 @@ int virtio_transport_do_socket_init(struct vsock_sock *vsk,
 EXPORT_SYMBOL_GPL(virtio_transport_do_socket_init);
 
 /* sk_lock held by the caller */
-void virtio_transport_notify_buffer_size(struct vsock_sock *vsk, u64 *val)
+void virtio_transport_notify_buffer_size(struct vsock_sock *vsk, u64 *val) // 通知对端buffer size
 {
 	struct virtio_vsock_sock *vvs = vsk->trans;
 
@@ -504,7 +507,7 @@ EXPORT_SYMBOL_GPL(virtio_transport_notify_buffer_size);
 int
 virtio_transport_notify_poll_in(struct vsock_sock *vsk,
 				size_t target,
-				bool *data_ready_now)
+				bool *data_ready_now) // 有输入
 {
 	if (vsock_stream_has_data(vsk))
 		*data_ready_now = true;
@@ -518,7 +521,7 @@ EXPORT_SYMBOL_GPL(virtio_transport_notify_poll_in);
 int
 virtio_transport_notify_poll_out(struct vsock_sock *vsk,
 				 size_t target,
-				 bool *space_avail_now)
+				 bool *space_avail_now) // 有输出
 {
 	s64 free_space;
 
@@ -620,7 +623,7 @@ bool virtio_transport_dgram_allow(u32 cid, u32 port)
 }
 EXPORT_SYMBOL_GPL(virtio_transport_dgram_allow);
 
-int virtio_transport_connect(struct vsock_sock *vsk)
+int virtio_transport_connect(struct vsock_sock *vsk) // 发送connect消息
 {
 	struct virtio_vsock_pkt_info info = {
 		.op = VIRTIO_VSOCK_OP_REQUEST,
@@ -632,7 +635,7 @@ int virtio_transport_connect(struct vsock_sock *vsk)
 }
 EXPORT_SYMBOL_GPL(virtio_transport_connect);
 
-int virtio_transport_shutdown(struct vsock_sock *vsk, int mode)
+int virtio_transport_shutdown(struct vsock_sock *vsk, int mode) // shutdown
 {
 	struct virtio_vsock_pkt_info info = {
 		.op = VIRTIO_VSOCK_OP_SHUTDOWN,
@@ -661,7 +664,7 @@ EXPORT_SYMBOL_GPL(virtio_transport_dgram_enqueue);
 ssize_t
 virtio_transport_stream_enqueue(struct vsock_sock *vsk,
 				struct msghdr *msg,
-				size_t len)
+				size_t len)				// stream数据读写
 {
 	struct virtio_vsock_pkt_info info = {
 		.op = VIRTIO_VSOCK_OP_RW,
@@ -684,7 +687,7 @@ void virtio_transport_destruct(struct vsock_sock *vsk)
 EXPORT_SYMBOL_GPL(virtio_transport_destruct);
 
 static int virtio_transport_reset(struct vsock_sock *vsk,
-				  struct virtio_vsock_pkt *pkt)
+				  struct virtio_vsock_pkt *pkt) // 发送RST
 {
 	struct virtio_vsock_pkt_info info = {
 		.op = VIRTIO_VSOCK_OP_RST,
@@ -702,6 +705,7 @@ static int virtio_transport_reset(struct vsock_sock *vsk,
 
 /* Normally packets are associated with a socket.  There may be no socket if an
  * attempt was made to connect to a socket that does not exist.
+ * 连接一个不存在的Socket
  */
 static int virtio_transport_reset_no_sock(const struct virtio_transport *t,
 					  struct virtio_vsock_pkt *pkt)
@@ -713,7 +717,9 @@ static int virtio_transport_reset_no_sock(const struct virtio_transport *t,
 		.reply = true,
 	};
 
-	/* Send RST only if the original pkt is not a RST pkt */
+	/* Send RST only if the original pkt is not a RST pkt
+	 * 发送一个RST packet
+	 * */
 	if (le16_to_cpu(pkt->hdr.op) == VIRTIO_VSOCK_OP_RST)
 		return 0;
 
@@ -752,7 +758,7 @@ static void virtio_transport_remove_sock(struct vsock_sock *vsk)
 
 static void virtio_transport_wait_close(struct sock *sk, long timeout)
 {
-	if (timeout) {
+	if (timeout) { // 等待如何实现的 ??????
 		DEFINE_WAIT_FUNC(wait, woken_wake_function);
 
 		add_wait_queue(sk_sleep(sk), &wait);
@@ -1037,7 +1043,7 @@ static bool virtio_transport_space_update(struct sock *sk,
 /* Handle server socket */
 static int
 virtio_transport_recv_listen(struct sock *sk, struct virtio_vsock_pkt *pkt,
-			     struct virtio_transport *t)
+			     struct virtio_transport *t) // 处理server监听到的Socket
 {
 	struct vsock_sock *vsk = vsock_sk(sk);
 	struct vsock_sock *vchild;
@@ -1049,29 +1055,31 @@ virtio_transport_recv_listen(struct sock *sk, struct virtio_vsock_pkt *pkt,
 		return -EINVAL;
 	}
 
-	if (sk_acceptq_is_full(sk)) {
+	if (sk_acceptq_is_full(sk)) { // 当前接收的请求超过backlog
 		virtio_transport_reset_no_sock(t, pkt);
 		return -ENOMEM;
 	}
 
-	child = vsock_create_connected(sk);
+	child = vsock_create_connected(sk);		// 创建一个连接好的的vsock socket
 	if (!child) {
 		virtio_transport_reset_no_sock(t, pkt);
 		return -ENOMEM;
 	}
 
-	sk_acceptq_added(sk);
+	sk_acceptq_added(sk);				// 接收连接
 
 	lock_sock_nested(child, SINGLE_DEPTH_NESTING);
 
 	child->sk_state = TCP_ESTABLISHED;
 
+	// 更新新的Socket的src和peer地址
 	vchild = vsock_sk(child);
 	vsock_addr_init(&vchild->local_addr, le64_to_cpu(pkt->hdr.dst_cid),
 			le32_to_cpu(pkt->hdr.dst_port));
 	vsock_addr_init(&vchild->remote_addr, le64_to_cpu(pkt->hdr.src_cid),
 			le32_to_cpu(pkt->hdr.src_port));
 
+	// 分配当前transport
 	ret = vsock_assign_transport(vchild, vsk);
 	/* Transport assigned (looking at remote_addr) must be the same
 	 * where we received the request.
@@ -1100,16 +1108,16 @@ virtio_transport_recv_listen(struct sock *sk, struct virtio_vsock_pkt *pkt,
  * lock.
  */
 void virtio_transport_recv_pkt(struct virtio_transport *t,
-			       struct virtio_vsock_pkt *pkt)
+			       struct virtio_vsock_pkt *pkt)	// 接收包
 {
 	struct sockaddr_vm src, dst;
 	struct vsock_sock *vsk;
 	struct sock *sk;
 	bool space_available;
 
-	vsock_addr_init(&src, le64_to_cpu(pkt->hdr.src_cid),
+	vsock_addr_init(&src, le64_to_cpu(pkt->hdr.src_cid),		// 获取src地址
 			le32_to_cpu(pkt->hdr.src_port));
-	vsock_addr_init(&dst, le64_to_cpu(pkt->hdr.dst_cid),
+	vsock_addr_init(&dst, le64_to_cpu(pkt->hdr.dst_cid),		// 获取目的地址
 			le32_to_cpu(pkt->hdr.dst_port));
 
 	trace_virtio_transport_recv_pkt(src.svm_cid, src.svm_port,
@@ -1133,18 +1141,18 @@ void virtio_transport_recv_pkt(struct virtio_transport *t,
 	if (!sk) {
 		sk = vsock_find_bound_socket(&dst);
 		if (!sk) {
-			(void)virtio_transport_reset_no_sock(t, pkt);
+			(void)virtio_transport_reset_no_sock(t, pkt); // 发送RST
 			goto free_pkt;
 		}
 	}
 
-	vsk = vsock_sk(sk);
+	vsk = vsock_sk(sk);	// 找到vsock socket
 
 	lock_sock(sk);
 
 	/* Check if sk has been closed before lock_sock */
 	if (sock_flag(sk, SOCK_DONE)) {
-		(void)virtio_transport_reset_no_sock(t, pkt);
+		(void)virtio_transport_reset_no_sock(t, pkt); // 已经关闭，发送RST
 		release_sock(sk);
 		sock_put(sk);
 		goto free_pkt;
@@ -1159,7 +1167,7 @@ void virtio_transport_recv_pkt(struct virtio_transport *t,
 		sk->sk_write_space(sk);
 
 	switch (sk->sk_state) {
-	case TCP_LISTEN:
+	case TCP_LISTEN:						// 当前正在监听
 		virtio_transport_recv_listen(sk, pkt, t);
 		virtio_transport_free_pkt(pkt);
 		break;
@@ -1193,9 +1201,9 @@ free_pkt:
 }
 EXPORT_SYMBOL_GPL(virtio_transport_recv_pkt);
 
-void virtio_transport_free_pkt(struct virtio_vsock_pkt *pkt)
+void virtio_transport_free_pkt(struct virtio_vsock_pkt *pkt) // 释放pkt
 {
-	kfree(pkt->buf);
+	kfree(pkt->buf);	// 释放缓冲区（数据区）
 	kfree(pkt);
 }
 EXPORT_SYMBOL_GPL(virtio_transport_free_pkt);

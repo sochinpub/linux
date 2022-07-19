@@ -11,10 +11,11 @@
 #include <linux/if_arp.h>
 
 static DEFINE_SPINLOCK(vsock_tap_lock);
+// 挂链所有的vsok taap设备
 static struct list_head vsock_tap_all __read_mostly =
 				LIST_HEAD_INIT(vsock_tap_all);
 
-int vsock_add_tap(struct vsock_tap *vt)
+int vsock_add_tap(struct vsock_tap *vt) // 添加当前设备
 {
 	if (unlikely(vt->dev->type != ARPHRD_VSOCKMON))
 		return -EINVAL;
@@ -36,7 +37,7 @@ int vsock_remove_tap(struct vsock_tap *vt)
 
 	spin_lock(&vsock_tap_lock);
 
-	list_for_each_entry(tmp, &vsock_tap_all, list) {
+	list_for_each_entry(tmp, &vsock_tap_all, list) { // 移除当前设备
 		if (vt == tmp) {
 			list_del_rcu(&vt->list);
 			found = true;
@@ -61,9 +62,9 @@ static int __vsock_deliver_tap_skb(struct sk_buff *skb,
 				   struct net_device *dev)
 {
 	int ret = 0;
-	struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
+	struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC); // 克隆该包
 
-	if (nskb) {
+	if (nskb) {		// 在tap设备上发送该包
 		dev_hold(dev);
 
 		nskb->dev = dev;
@@ -82,7 +83,7 @@ static void __vsock_deliver_tap(struct sk_buff *skb)
 	int ret;
 	struct vsock_tap *tmp;
 
-	list_for_each_entry_rcu(tmp, &vsock_tap_all, list) {
+	list_for_each_entry_rcu(tmp, &vsock_tap_all, list) { // 在每个tap设备上都过一遍
 		ret = __vsock_deliver_tap_skb(skb, tmp->dev);
 		if (unlikely(ret))
 			break;
@@ -98,7 +99,7 @@ void vsock_deliver_tap(struct sk_buff *build_skb(void *opaque), void *opaque)
 	if (likely(list_empty(&vsock_tap_all)))
 		goto out;
 
-	skb = build_skb(opaque);
+	skb = build_skb(opaque);	// 创建socket buffer
 	if (skb) {
 		__vsock_deliver_tap(skb);
 		consume_skb(skb);

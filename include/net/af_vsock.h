@@ -207,9 +207,9 @@ bool vsock_find_cid(unsigned int cid);
 /**** TAP ****/
 
 struct vsock_tap {
-	struct net_device *dev;
+	struct net_device *dev;	// 网络设备
 	struct module *module;
-	struct list_head list;
+	struct list_head list;	// 挂链项
 };
 
 int vsock_init_tap(void);

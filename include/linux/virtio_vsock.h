@@ -7,19 +7,19 @@
 #include <net/sock.h>
 #include <net/af_vsock.h>
 
-#define VIRTIO_VSOCK_DEFAULT_RX_BUF_SIZE	(1024 * 4)
+#define VIRTIO_VSOCK_DEFAULT_RX_BUF_SIZE	(1024 * 4) // 默认接收缓冲区4KB
 #define VIRTIO_VSOCK_MAX_BUF_SIZE		0xFFFFFFFFUL
-#define VIRTIO_VSOCK_MAX_PKT_BUF_SIZE		(1024 * 64)
+#define VIRTIO_VSOCK_MAX_PKT_BUF_SIZE		(1024 * 64)	// 64KB
 
 enum {
-	VSOCK_VQ_RX     = 0, /* for host to guest data */
-	VSOCK_VQ_TX     = 1, /* for guest to host data */
-	VSOCK_VQ_EVENT  = 2,
+	VSOCK_VQ_RX     = 0, /* for host to guest data 0队列用作 h2g */
+	VSOCK_VQ_TX     = 1, /* for guest to host data 1队列用作 g2h*/
+	VSOCK_VQ_EVENT  = 2, /* events */
 	VSOCK_VQ_MAX    = 3,
 };
 
 /* Per-socket state (accessed via vsk->trans) */
-struct virtio_vsock_sock {
+struct virtio_vsock_sock { //
 	struct vsock_sock *vsk;
 
 	spinlock_t tx_lock;
@@ -38,20 +38,20 @@ struct virtio_vsock_sock {
 	struct list_head rx_queue;
 };
 
-struct virtio_vsock_pkt {
+struct virtio_vsock_pkt {	// virtio vsock的包
 	struct virtio_vsock_hdr	hdr;
 	struct list_head list;
 	/* socket refcnt not held, only use for cancellation */
-	struct vsock_sock *vsk;
+	struct vsock_sock *vsk;	//vsock socket
 	void *buf;
 	u32 buf_len;
 	u32 len;
-	u32 off;
+	u32 off;			// 当前发送的位置
 	bool reply;
 	bool tap_delivered;
 };
 
-struct virtio_vsock_pkt_info {
+struct virtio_vsock_pkt_info { // pkt info
 	u32 remote_cid, remote_port;
 	struct vsock_sock *vsk;
 	struct msghdr *msg;
