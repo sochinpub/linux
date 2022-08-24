@@ -57,6 +57,7 @@
 /*
  * Kernel startup entry point.
  * ---------------------------
+ * Kernel启动入口点
  *
  * The requirements are:
  *   MMU = off, D-cache = off, I-cache = on or off,
@@ -73,6 +74,7 @@
 _head:
 	/*
 	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
+	 * linux boot-loader(u-boot)需要镜像头
 	 */
 #ifdef CONFIG_EFI
 	/*
@@ -115,7 +117,7 @@ pe_header:
 	 */
 ENTRY(stext)
 	bl	preserve_boot_args
-	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode 降级到异常级别1，寄存器w0存放cpu_boot_mode
 	adrp	x23, __PHYS_OFFSET
 	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
 	bl	set_cpu_boot_mode_flag
