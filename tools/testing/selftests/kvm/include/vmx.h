@@ -339,6 +339,10 @@ struct vmx_msr_entry {
 	uint64_t value;
 } __attribute__ ((aligned(16)));
 
+/***************************************************
+ * Sochin: VM instructions
+ * 
+ *************************************************/
 static inline int vmxon(uint64_t phys)
 {
 	uint8_t ret;
@@ -518,7 +522,7 @@ static inline uint32_t vmcs_revision(void)
 {
 	return rdmsr(MSR_IA32_VMX_BASIC);
 }
-
+// Sochin: at most 4KB VMX pages
 struct vmx_pages {
 	void *vmxon_hva;
 	uint64_t vmxon_gpa;

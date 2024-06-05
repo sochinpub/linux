@@ -2524,12 +2524,13 @@ static void svm_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 	mark_dirty(svm->vmcb, VMCB_CR);
 	update_cr0_intercept(svm);
 }
-
+// Sochin: 
 static int svm_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4)
 {
 	unsigned long host_cr4_mce = cr4_read_shadow() & X86_CR4_MCE;
 	unsigned long old_cr4 = to_svm(vcpu)->vmcb->save.cr4;
 
+	// Sochin: SDM 23.7, VMX operation
 	if (cr4 & X86_CR4_VMXE)
 		return 1;
 

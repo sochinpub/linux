@@ -24,7 +24,7 @@
 /*
  * VMX functions:
  */
-
+// Sochin: SDM 23.6
 static inline int cpu_has_vmx(void)
 {
 	unsigned long ecx = cpuid_ecx(1);
@@ -37,6 +37,7 @@ static inline int cpu_has_vmx(void)
  * vmxoff causes a undefined-opcode exception if vmxon was not run
  * on the CPU previously. Only call this function if you know VMX
  * is enabled.
+ * Sochin: system software can enter VMX operation, it enables VMX by setting CR4.VMXe[bit 13] = 1, @SDM 23.7
  */
 static inline void cpu_vmxoff(void)
 {
@@ -80,10 +81,11 @@ static inline void cpu_emergency_vmxoff(void)
  * if the function returns zero. Simply pass NULL if you are not interested
  * on the messages; gcc should take care of not generating code for
  * the messages on this case.
+ * Sochin: AMD SVM
  */
 static inline int cpu_has_svm(const char **msg)
 {
-	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) {
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD) { // Sochin: should be x86 by AMD
 		if (msg)
 			*msg = "not amd";
 		return 0;

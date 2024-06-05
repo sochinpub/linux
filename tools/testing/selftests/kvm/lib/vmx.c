@@ -86,7 +86,9 @@ bool prepare_for_vmx_operation(struct vmx_pages *vmx)
 	__asm__ __volatile__("mov %%cr4, %0" : "=r"(cr4) : : "memory");
 	cr4 &= rdmsr(MSR_IA32_VMX_CR4_FIXED1);
 	cr4 |= rdmsr(MSR_IA32_VMX_CR4_FIXED0);
-	/* Enable VMX operation */
+	/* Enable VMX operation 
+	 * Sochin: SDM 23.7
+	*/
 	cr4 |= X86_CR4_VMXE;
 	__asm__ __volatile__("mov %0, %%cr4" : : "r"(cr4) : "memory");
 

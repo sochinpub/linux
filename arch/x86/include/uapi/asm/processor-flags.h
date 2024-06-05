@@ -114,7 +114,7 @@
 #define X86_CR4_UMIP		_BITUL(X86_CR4_UMIP_BIT)
 #define X86_CR4_LA57_BIT	12 /* enable 5-level page tables */
 #define X86_CR4_LA57		_BITUL(X86_CR4_LA57_BIT)
-#define X86_CR4_VMXE_BIT	13 /* enable VMX virtualization */
+#define X86_CR4_VMXE_BIT	13 /* enable VMX virtualization Sochin: enable VMX operations. SDM 23.7 */
 #define X86_CR4_VMXE		_BITUL(X86_CR4_VMXE_BIT)
 #define X86_CR4_SMXE_BIT	14 /* enable safer mode (TXT) */
 #define X86_CR4_SMXE		_BITUL(X86_CR4_SMXE_BIT)

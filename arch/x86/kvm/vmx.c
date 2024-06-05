@@ -356,16 +356,25 @@ struct kvm_vmx {
 };
 
 #define NR_AUTOLOAD_MSRS 8
-
+// Sochin: SDM 24.2
 struct vmcs_hdr {
-	u32 revision_id:31;
-	u32 shadow_vmcs:1;
+	u32 revision_id:31;			// 0 - 30, VMCS revision identifier
+	u32 shadow_vmcs:1;			// 31, shadow-VMCS indicator
 };
-
+// Sochin: VMCS
 struct vmcs {
-	struct vmcs_hdr hdr;
-	u32 abort;
-	char data[0];
+	struct vmcs_hdr hdr;	// 0 - 4B
+	u32 abort;				// 4 - 8B, VM-abort indicator
+	char data[0];			// 8B - 4KB, VMCS data(implementation specific format, SDM 24.2)
+	/*
+	// 1) Guest-state area
+	   2) Host-state area
+	   3) VM-execution control fields
+	   4) VM-exit control fields
+	   5) Vm-entry control fileds
+	   6) VM-exit information fields
+	   2),3),4) is VMX controls
+	*/
 };
 
 /*

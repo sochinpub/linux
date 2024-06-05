@@ -532,6 +532,7 @@ static void emergency_vmx_disable_all(void)
 		cpu_vmxoff();
 
 		/* Halt and disable VMX on the other CPUs */
+		// Sochin: use nmi to disable VMX on other CPUs
 		nmi_shootdown_cpus(vmxoff_nmi);
 
 	}
